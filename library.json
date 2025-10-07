@@ -1,0 +1,58 @@
+{
+  "name": "RCLink",
+  "version": "1.0.0",
+  "description": "Header-only RC link for Arduino/ESP32 with iBUS/SBUS transports, per-channel shaping, filtering, JSON config, and one-line failsafe signature helpers.",
+  "keywords": [
+    "rc",
+    "ibus",
+    "sbus",
+    "radio",
+    "receiver",
+    "esp32",
+    "arduino",
+    "failsafe",
+    "joystick"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/littlemanbuilds/RCLink"
+  },
+  "authors": [
+    {
+      "name": "Little Man Builds",
+      "email": "littlemanbuilds@gmail.com",
+      "maintainer": true
+    }
+  ],
+  "frameworks": [
+    "arduino"
+  ],
+  "platforms": [
+    "*"
+  ],
+  "export": {
+    "include": [
+      "src",
+      "examples",
+      "README.md",
+      "LICENSE",
+      "keywords.txt",
+      "library.properties"
+    ]
+  },
+  "dependencies": [
+    {
+      "name": "ArduinoJson",
+      "owner": "bblanchon",
+      "version": "^7.4.2",
+      "frameworks": [
+        "arduino"
+      ],
+      "platforms": [
+        "*"
+      ],
+      "optional": true
+    }
+  ],
+  "license": "MIT"
+}

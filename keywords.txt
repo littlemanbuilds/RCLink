@@ -1,0 +1,54 @@
+#######################################
+# Datatypes (KEYWORD1)
+#######################################
+RcLink                KEYWORD1
+RcConfig              KEYWORD1
+RcLinkStatus          KEYWORD1
+RcTransportCaps       KEYWORD1
+RcFailsafeRule        KEYWORD1
+RcFrame               KEYWORD1
+RcChannelSpec         KEYWORD1
+RcAxisSpec            KEYWORD1
+RcSwitchSpec          KEYWORD1
+RcIbusTransport       KEYWORD1
+RcSbusEsp32Transport  KEYWORD1
+Failsafe              KEYWORD1
+ChannelKind           KEYWORD1
+ChClass               KEYWORD1
+
+#######################################
+# Methods and Functions (KEYWORD2)
+#######################################
+to_string                     KEYWORD2
+role_count                    KEYWORD2
+role_by_index                 KEYWORD2
+make_signature_all             KEYWORD2
+make_signature_with_overrides  KEYWORD2
+make_signature_selected        KEYWORD2
+failsafe_expected_frame        KEYWORD2
+failsafe_signature             KEYWORD2
+apply_rxfs_outputs             KEYWORD2
+is_apply_rxfs_outputs          KEYWORD2
+changed                        KEYWORD2
+run_ibus                       KEYWORD2
+
+#######################################
+# Macros (KEYWORD2)
+#######################################
+RC_DECLARE_ROLES                 KEYWORD2
+RC_CONFIG                         KEYWORD2
+RC_CFG_MAP_RANGE                  KEYWORD2
+RC_CFG_MAP_DEFAULT                KEYWORD2
+RC_PRINT_ALL                      KEYWORD2
+RC_FOR_EACH_ROLE                  KEYWORD2
+RC_SET_FS_SIGNATURE_ALL            KEYWORD2
+RC_SET_FS_SIGNATURE_OVERRIDES      KEYWORD2
+RC_SET_FS_SIGNATURE_SELECTED       KEYWORD2
+
+#######################################
+# Constants (LITERAL1)
+#######################################
+kNoSignalThresholdUs   LITERAL1
+kIbusMaxChannels       LITERAL1
+kSbusChannels          LITERAL1
+kRcMaxSwitchVals       LITERAL1
