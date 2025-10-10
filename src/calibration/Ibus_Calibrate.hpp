@@ -440,9 +440,8 @@ namespace rc::calibrate
                 }
                 Serial.printf("// Ch_%d (Axis) : Range ≈ %d..%d µs (center ≈ %d)\n",
                               i, rawMin, rawMax, rawCenter);
-                Serial.printf("cfg.map(/*Role*/,(uint8_t)%d).axis(/*Role*/)"
-                              ".raw(%d,%d,%d).out(-100,100).deadband_us(%d).expo(0.00f).done();\n\n",
-                              i, rawMin, rawMax, rawCenter, suggestedDeadband);
+                Serial.printf("cfg.axis(/*Role*/).raw(%d,%d,%d).out(-100,100).deadband_us(%d).expo(0.00f).done();\n\n",
+                              rawMin, rawMax, rawCenter, suggestedDeadband);
             }
             else
             {
@@ -460,7 +459,7 @@ namespace rc::calibrate
                 }
                 Serial.println(F(" } µs"));
 
-                Serial.printf("cfg.map(/*Role*/,(uint8_t)%d).sw(/*Role*/).raw_levels({", i);
+                Serial.printf("cfg.sw(/*Role*/).raw_levels({");
                 for (std::uint8_t k = 0; k < useN && k < n; ++k)
                 {
                     Serial.print(lv[k]);
