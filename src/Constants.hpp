@@ -6,7 +6,7 @@
  * @file Constants.hpp
  * @author Little Man Builds (Darren Osborne)
  * @date 2025-10-03
- * @copyright © 2025 Little Man Builds
+ * @copyright Copyright © 2026 Little Man Builds
  */
 
 #pragma once
@@ -22,4 +22,4 @@ namespace rc
     constexpr int kNoSignalThresholdUs = 200; ///< Raw µs below this → treat as “no signal”.
     constexpr int kIbusMaxChannels = 14;      ///< Max iBUS channel count.
     constexpr int kSbusChannels = 16;         ///< sBUS channel count.
-} ///< namespace rc.
+} ///< namespace rc

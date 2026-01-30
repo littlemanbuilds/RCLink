@@ -6,7 +6,7 @@
  * @file RCLink.h
  * @author Little Man Builds (Darren Osborne)
  * @date 2025-10-03
- * @copyright © 2025 Little Man Builds
+ * @copyright Copyright © 2026 Little Man Builds
  */
 
 #pragma once
@@ -23,6 +23,6 @@
 #include <transport/Sbus_Esp32.hpp>
 
 // ---- Version macro ---- //
-#define RCLINK_VERSION "1.0.0"
+#define RCLINK_VERSION "1.0.3"
 
 using namespace rc; ///< Make rc:: types available without prefix.

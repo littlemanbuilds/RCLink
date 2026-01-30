@@ -6,7 +6,7 @@
  * @file Types.hpp
  * @author Little Man Builds (Darren Osborne)
  * @date 2025-10-03
- * @copyright © 2025 Little Man Builds
+ * @copyright Copyright © 2026 Little Man Builds
  */
 
 #pragma once
@@ -139,4 +139,4 @@ namespace rc
         std::uint16_t hold_ms{120}; ///< Must persist at least this long (ms).
     };
 
-} ///< namespace rc.
+} ///< namespace rc

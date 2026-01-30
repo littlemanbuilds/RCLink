@@ -6,7 +6,7 @@
  * @file Sbus_Esp32.hpp
  * @author Little Man Builds (Darren Osborne)
  * @date 2025-10-03
- * @copyright © 2025 Little Man Builds
+ * @copyright Copyright © 2026 Little Man Builds
  */
 
 #pragma once
@@ -185,4 +185,4 @@ namespace rc
         int ch_us_[kSbusChannels]{};      ///< Channels in microseconds.
     };
 
-} ///< namespace rc.
+} ///< namespace rc

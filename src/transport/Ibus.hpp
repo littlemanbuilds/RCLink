@@ -6,7 +6,7 @@
  * @file Ibus.hpp
  * @author Little Man Builds (Darren Osborne)
  * @date 2025-10-03
- * @copyright © 2025 Little Man Builds
+ * @copyright Copyright © 2026 Little Man Builds
  */
 
 #pragma once
@@ -222,4 +222,4 @@ namespace rc
         std::uint32_t last_good_ms_{0};   ///< Timestamp of last frame (ms).
     };
 
-} ///< namespace rc.
+} ///< namespace rc

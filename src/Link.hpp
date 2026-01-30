@@ -6,7 +6,7 @@
  * @file Link.hpp
  * @author Little Man Builds (Darren Osborne)
  * @date 2025-10-03
- * @copyright © 2025 Little Man Builds
+ * @copyright Copyright © 2026 Little Man Builds
  */
 
 #pragma once
@@ -650,4 +650,4 @@ namespace rc
         mutable std::int8_t sw_active_idx_[N]{};                  ///< Current snapped index (-1 none).
     };
 
-} ///< namespace rc.
+} ///< namespace rc

@@ -6,7 +6,7 @@
  * @file Ibus_Calibrate.hpp
  * @author Little Man Builds (Darren Osborne)
  * @date 2025-10-03
- * @copyright © 2025 Little Man Builds
+ * @copyright Copyright © 2026 Little Man Builds
  */
 
 #pragma once
@@ -653,4 +653,4 @@ namespace rc::calibrate
         Serial.println(F("Calibration finished. Copy the suggestion above into your config.\n\n"));
     }
 
-} ///< namespace rc::calibrate.
+} ///< namespace rc::calibrate
