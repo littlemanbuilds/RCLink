@@ -16,7 +16,7 @@ The library is lightweight, **device‑agnostic**, and integrates cleanly with A
 - **Per‑channel shaping:** raw calibration (µs), deadband, output range, expo, invert.
 - **Filtering:** per‑axis EMA (`setAxisFilter`) + epsilon suppression (`setEpsilon`).
 - **Failsafe:** per‑channel policies + **receiver‑failsafe signatures** (select which roles & expected values).
-- **Signature apply policy:** `apply_rxfs_outputs(true/false)` — choose whether signature detection should **apply** your failsafe outputs or only **report** it.
+- **Failsafe apply policy:** link loss and protocol failsafe always apply safe outputs; `apply_rxfs_outputs(true/false)` controls only receiver-signature matches.
 - **Status:** unified `RcLinkStatus` (fps, link age, protocol flags, CRC errors).
 - **Header‑only** core; optional JSON loader (ArduinoJson) and an iBUS calibrator.
 - **iBUS Calibrator:** interactive histogram/clustering helper to generate channel specs.
@@ -245,6 +245,7 @@ A **receiver‑failsafe signature** detects when the RX is still sending frames 
 
 - `status().rx_failsafe_sig` — set when the incoming _scaled_ values match the configured signature for at least `hold_ms`.
 - `apply_rxfs_outputs(true/false)` — if **true**, the link immediately **applies your failsafe policy outputs** (as if the link were lost). If **false** (default), it only reports `rx_failsafe_sig` and continues to pass through the live frames.
+- `status().proto_failsafe` — protocol-level failsafe is safety-critical and always applies your failsafe policy outputs, regardless of `apply_rxfs_outputs()`.
 
 **Signature macros** (scaled space):
 
@@ -295,7 +296,7 @@ void loop() {
   if (!st.link_ok || st.proto_failsafe || st.rx_failsafe_sig) {
     if (!printedFailsafe) {
       Serial.println(st.link_ok ? "Failsafe: signature or protoFS" : "Failsafe: link lost");
-      RC_PRINT_ALL(rclink, Flysky); // applied outputs (if apply policy enabled)
+      RC_PRINT_ALL(rclink, Flysky); // safe outputs for link/proto FS; RX signature depends on apply policy
       printedFailsafe = true;
     }
   } else {

@@ -237,9 +237,9 @@ namespace rc
                 fsig_first_ms_ = 0u;
             }
 
-            // Expose safe outputs and apply per-channel failsafe policy when an RX signature
-            // is detected and rxfs_apply_outputs_ is enabled (treat like link-lost for outputs).
-            if (!status_.link_ok || (status_.rx_failsafe_sig && rxfs_apply_outputs_))
+            // Link loss and protocol failsafe always apply safe outputs.
+            // RX-signature failsafe only applies outputs when explicitly enabled.
+            if (!status_.link_ok || status_.proto_failsafe || (status_.rx_failsafe_sig && rxfs_apply_outputs_))
             {
                 for (std::size_t i = 0; i < N; ++i)
                     out_.vals[i] = apply_failsafe(i);
