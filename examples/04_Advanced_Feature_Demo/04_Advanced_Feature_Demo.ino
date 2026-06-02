@@ -53,7 +53,7 @@ void setup()
     cfg.setEpsilon(Flysky::Ch6_VrB, 2);
 
     /// EMA filter = smoothing factor (0.0–1.0, dimensionless).
-    // 0.0 = no smoothing, 1.0 = ultra sluggish.
+    // 0.0 = no smoothing; lower nonzero values smooth more, higher values track faster.
     cfg.setAxisFilter(Flysky::Ch1_RH, 0.20f); ///< 20% blend with previous value.
     cfg.setAxisFilter(Flysky::Ch2_RV, 0.20f);
     cfg.setAxisFilter(Flysky::Ch3_LV, 0.10f); ///< Throttle: smoother but still responsive.

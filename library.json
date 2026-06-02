@@ -1,7 +1,7 @@
 {
   "name": "RCLink",
-  "version": "1.0.4",
-  "description": "Header-only RC link for Arduino/ESP32 with iBUS/SBUS transports, per-channel shaping, filtering, JSON config, and one-line failsafe signature helpers.",
+  "version": "1.1.0",
+  "description": "Header-only RC link for ESP32 Arduino with iBUS and ESP32-only SBUS transports, per-channel shaping, filtering, JSON config, and one-line failsafe signature helpers.",
   "keywords": [
     "rc",
     "ibus",

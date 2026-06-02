@@ -63,7 +63,7 @@ namespace rc
         // ---- Auto-learning controls (used only when raw_count == 0) ---- //
         bool auto_levels{true};        ///< Learn raw µs centroids from live data. Defaults to on.
         std::uint16_t hyst_us{60};     ///< Hysteresis band (µs) to avoid chatter around boundaries.
-        float learn_alpha{0.20f};      ///< EMA rate for centroid updates (0..1]. Higher = slower change.
+        float learn_alpha{0.20f};      ///< EMA rate for centroid updates (0..1]. Higher = faster change.
         std::uint16_t min_sep_us{120}; ///< Minimum separation enforced between learned centroids, µs. ///< TODO: reserved for future enforcement.
     };
 

@@ -23,6 +23,6 @@
 #include <transport/Sbus_Esp32.hpp>
 
 // ---- Version macro ---- //
-#define RCLINK_VERSION "1.0.4"
+#define RCLINK_VERSION "1.1.0"
 
 using namespace rc; ///< Make rc:: types available without prefix.

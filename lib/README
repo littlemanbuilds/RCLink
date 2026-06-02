@@ -1,4 +1,13 @@
 
+RCLink target note
+==================
+
+RCLink is packaged and tested for ESP32 Arduino (`espressif32`; current
+PlatformIO target: `esp32-s3-devkitc-1`). The SBUS transport is ESP32-only
+because it uses the ESP32 inverted UART overload. The iBUS transport and
+calibration helpers use Arduino-style `HardwareSerial` and are release-tested
+on ESP32 in this repository.
+
 This directory is intended for project specific (private) libraries.
 PlatformIO will compile them to static libraries and link into the executable file.
 

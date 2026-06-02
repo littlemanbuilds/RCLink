@@ -29,7 +29,7 @@ namespace rc
         // Failsafe & noise suppression.
         Failsafe fs[N]{};          ///< Per-channel failsafe policy.
         std::int16_t epsilon[N]{}; ///< Ignore |delta| <= epsilon on reporting.
-        float axis_ema_alpha[N]{}; ///< 0=disabled, 1=very slow.
+        float axis_ema_alpha[N]{}; ///< 0=disabled; higher values follow input faster.
 
         // Link timeout.
         std::uint16_t link_timeout_ms{200}; ///< Link considered stale after this (ms).
@@ -240,7 +240,7 @@ namespace rc
 
             /**
              * @brief Set learning rate (EMA alpha) for auto-learn centroids.
-             * @param a Alpha in [0..1]; higher values move slower.
+             * @param a Alpha in [0..1]; higher values adapt faster.
              * @return Reference to the current SwitchB builder.
              */
             SwitchB &learn_alpha(float a)
@@ -329,7 +329,7 @@ namespace rc
         /**
          * @brief Set the axis filter coefficient (EMA alpha) for a given role.
          * @param role Role to configure.
-         * @param alpha Smoothing factor between 0.0 and 1.0 (values outside are clamped).
+         * @param alpha Smoothing factor between 0.0 and 1.0; higher values follow input faster.
          * @return Reference to the current RcConfig instance (for chaining).
          */
         RcConfig &setAxisFilter(E role, float alpha)

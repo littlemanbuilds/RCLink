@@ -11,6 +11,7 @@
 
 #pragma once
 
+#include <Arduino.h>
 #include <cstdint>
 #include <Types.hpp>
 #include <Constants.hpp>
@@ -67,8 +68,17 @@ namespace rc
                     buf_[idx_++] = b;
                     if (idx_ == kBuf)
                     {
-                        parse_frame();
-                        new_frame = true;
+                        if (validate())
+                        {
+                            parse_frame();
+                            last_good_ms_ = millis();
+                            frames_++;
+                            new_frame = true;
+                        }
+                        else
+                        {
+                            crc_errors_++;
+                        }
                         reset();
                     }
                     break;
@@ -103,6 +113,24 @@ namespace rc
         bool frameLost() const { return fl_flag_; }
 
         /**
+         * @brief Total number of valid frames parsed.
+         * @return Frame count.
+         */
+        std::uint32_t frames() const { return frames_; }
+
+        /**
+         * @brief Number of rejected frame-like packets.
+         * @return Error count. SBUS has no CRC, so this counts invalid footers.
+         */
+        std::uint32_t crcErrors() const { return crc_errors_; }
+
+        /**
+         * @brief Timestamp (ms) of the last valid frame.
+         * @return Milliseconds since boot of last valid frame.
+         */
+        std::uint32_t lastGoodMs() const { return last_good_ms_; }
+
+        /**
          * @brief Capability flags for this transport.
          * @return Transport capability structure.
          */
@@ -128,8 +156,19 @@ namespace rc
         {
             st_ = S::kWaitStart;
             idx_ = 0;
-            fs_flag_ = false;
-            fl_flag_ = false;
+        }
+
+        /// @brief Validate frame delimiter bytes.
+        /// @return true if the frame uses a known SBUS/SBUS2 footer.
+        bool validate() const
+        {
+            if (buf_[0] != 0x0F)
+                return false;
+
+            // Standard SBUS ends with 0x00. Some SBUS2 receivers use slot footers.
+            const std::uint8_t footer = buf_[kBuf - 1];
+            return footer == 0x00 || footer == 0x04 || footer == 0x14 ||
+                   footer == 0x24 || footer == 0x34;
         }
 
         /// @brief Decode one complete SBUS frame in @p buf_ into @p ch_us_ and flags.
@@ -183,6 +222,9 @@ namespace rc
         bool fs_flag_{false};             ///< Protocol failsafe bit.
         bool fl_flag_{false};             ///< Protocol frame-lost bit.
         int ch_us_[kSbusChannels]{};      ///< Channels in microseconds.
+        std::uint32_t frames_{0};         ///< Valid frames.
+        std::uint32_t crc_errors_{0};     ///< Invalid frame count (SBUS has no CRC).
+        std::uint32_t last_good_ms_{0};   ///< Timestamp of last frame (ms).
     };
 
 } ///< namespace rc

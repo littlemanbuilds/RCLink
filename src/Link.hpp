@@ -11,6 +11,7 @@
 
 #pragma once
 
+#include <Arduino.h>
 #include <cstdint>
 #include <cmath>
 #include <type_traits>
@@ -155,17 +156,13 @@ namespace rc
         /**
          * @brief Set per-axis EMA filter coefficient (0..1).
          * @param role Logical role to configure.
-         * @param alpha Smoothing factor; 0 disables; 1 is very slow.
+         * @param alpha Smoothing factor; 0 disables, higher values follow input faster.
          */
         void set_axis_filter(E role, float alpha)
         {
             cfg_.setAxisFilter(role, alpha);
         }
 
-        /**
-         * @brief Poll the transport and update scaled/filtered outputs.
-         * @param now Millis timestamp. Defaults to millis() for convenience or FreeRTOS clocks.
-         */
         /**
          * @brief Poll the transport and update scaled/filtered outputs.
          * @param now Millis timestamp. Defaults to millis() for convenience or FreeRTOS clocks.
@@ -260,14 +257,13 @@ namespace rc
             }
 
             // FPS estimator (~500 ms window).
-            static std::uint32_t last_count = 0, last_t = 0;
-            const std::uint32_t dt = now - last_t;
+            const std::uint32_t dt = now - fps_last_t_;
             if (dt >= 500u)
             {
-                const std::uint32_t df = status_.frames - last_count;
+                const std::uint32_t df = status_.frames - fps_last_count_;
                 status_.fps = static_cast<std::uint16_t>((df * 1000u) / (dt ? dt : 1u));
-                last_count = status_.frames;
-                last_t = now;
+                fps_last_count_ = status_.frames;
+                fps_last_t_ = now;
             }
         }
 
@@ -290,11 +286,36 @@ namespace rc
         }
 
         /**
+         * @brief Safely read a channel by enum-like role.
+         * @tparam EnumLike Any enum convertible to size_t index.
+         * @param name Logical role name.
+         * @param fallback Value returned when the role index is out of range.
+         * @return Scaled value for that role, or fallback if out of range.
+         */
+        template <typename EnumLike>
+        std::int16_t read_or(EnumLike name, std::int16_t fallback) const noexcept
+        {
+            const std::size_t i = static_cast<std::size_t>(name);
+            return (i < N) ? out_.vals[i] : fallback;
+        }
+
+        /**
          * @brief Read a channel by index.
          * @param i Logical index [0..N-1].
          * @return Scaled value for that index.
          */
         std::int16_t read_by_index(std::size_t i) const noexcept { return out_.vals[i]; }
+
+        /**
+         * @brief Safely read a channel by index.
+         * @param i Logical index [0..N-1].
+         * @param fallback Value returned when the index is out of range.
+         * @return Scaled value for that index, or fallback if out of range.
+         */
+        std::int16_t read_by_index_or(std::size_t i, std::int16_t fallback) const noexcept
+        {
+            return (i < N) ? out_.vals[i] : fallback;
+        }
 
         /**
          * @brief Obtain a snapshot of the link status.
@@ -637,6 +658,8 @@ namespace rc
         bool fsig_set_{false};            ///< Whether signature is configured.
         std::uint32_t fsig_first_ms_{0};  ///< First time signature matched (ms).
         bool rxfs_apply_outputs_ = false; ///< Apply app failsafe when RX signature is detected.
+        std::uint32_t fps_last_count_{0}; ///< Previous frame count for FPS estimator.
+        std::uint32_t fps_last_t_{0};     ///< Previous timestamp for FPS estimator.
 
         // Precomputed per-channel coefficients.
         float k_scale_[N]{};     ///< Raw→[-1..+1] scale per channel.

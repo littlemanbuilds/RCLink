@@ -11,6 +11,7 @@
 
 #pragma once
 
+#include <Arduino.h>
 #include <cstdint>
 #include <cstddef>
 #include <cmath>

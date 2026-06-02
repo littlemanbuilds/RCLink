@@ -1,8 +1,8 @@
 # RCLink
 
-Header‑only RC link for Arduino/ESP32 with **iBUS** and **SBUS** transports, flexible role mapping, per‑channel shaping and filtering, an optional JSON config loader, and **receiver‑failsafe signature detection** with a selectable **apply policy**.
+Header‑only RC link for **ESP32 Arduino** projects with **iBUS** and **SBUS** transports, flexible role mapping, per‑channel shaping and filtering, an optional JSON config loader, and **receiver‑failsafe signature detection** with a selectable **apply policy**.
 
-The library is lightweight, **device‑agnostic**, and integrates cleanly with Arduino sketches or ESP32 FreeRTOS projects.
+The high-level link is transport-agnostic, but this package is built and tested for ESP32 Arduino. The SBUS transport is intentionally ESP32-focused because it uses the ESP32 inverted UART path.
 
 > **Author:** Little Man Builds  
 > **License:** MIT
@@ -29,6 +29,7 @@ The library is lightweight, **device‑agnostic**, and integrates cleanly with A
   - [Highlights](#highlights)
   - [Contents](#contents)
   - [Installation](#installation)
+  - [Supported Targets](#supported-targets)
   - [Concepts](#concepts)
   - [Transports](#transports)
   - [Role Declaration \& Mapping](#role-declaration--mapping)
@@ -68,6 +69,16 @@ Optional dependency: **ArduinoJson** (only if you use the JSON loader).
 
 ---
 
+## Supported Targets
+
+- **Tested target:** ESP32-S3 DevKitC-1 with PlatformIO `espressif32` + Arduino (`platformio.ini`).
+- **Packaged target:** ESP32 Arduino (`architectures=esp32`, `platforms=espressif32`).
+- **iBUS:** uses Arduino-style `HardwareSerial` at 115200 8N1. It may work on other Arduino cores with the same UART API, but release validation here is ESP32.
+- **SBUS:** `RcSbusEsp32Transport` is ESP32-only. It uses 100000 baud, 8E2, inverted UART via the ESP32 `HardwareSerial::begin(..., true)` overload.
+- **JSON loader and calibrator:** written for Arduino sketches and validated with the ESP32 package target above.
+
+---
+
 ## Concepts
 
 - **Role** – a logical control in your app (`Throttle`, `Steering`, etc.) declared via `RC_DECLARE_ROLES`.
@@ -83,10 +94,10 @@ Optional dependency: **ArduinoJson** (only if you use the JSON loader).
 
 ## Transports
 
-- **iBUS** (`RcIbusTransport`) — standard 115 200 8N1; RX‑only UART.
-- **SBUS (ESP32)** (`RcSbusEsp32Transport`) — **100 000 baud, 8E2, inverted**; exposes protocol failsafe and frame‑lost flags.
+- **iBUS** (`RcIbusTransport`) — standard 115 200 8N1; RX‑only UART; tested on ESP32 Arduino.
+- **SBUS (ESP32)** (`RcSbusEsp32Transport`) — **100 000 baud, 8E2, inverted**; exposes protocol failsafe and frame‑lost flags; ESP32-only.
 
-Both transports implement the same minimal interface used by `RcLink`, so you can switch between them without changing higher‑level code.
+Both transports implement the same minimal interface used by `RcLink`, so you can switch between them on ESP32 without changing higher‑level code.
 
 ---
 
@@ -203,14 +214,14 @@ cfg.sw(Flysky::Ch10_SwD)
    .values({0.f, 1.f})
    .auto_levels(true)
    .hysteresis_us(60)
-   .learn_alpha(0.20f)
+   .learn_alpha(0.20f)   // higher values adapt faster
    .done();
 ```
 
 ### Filtering & Epsilon
 
 ```cpp
-// EMA filter (0..1). Higher = more smoothing (slower). Axis only.
+// EMA filter (0..1). 0 disables; higher values follow input faster. Axis only.
 cfg.setAxisFilter(Flysky::Ch1_RH, 0.20f);
 cfg.setAxisFilter(Flysky::Ch2_RV, 0.20f);
 cfg.setAxisFilter(Flysky::Ch3_LV, 0.10f);
@@ -490,6 +501,9 @@ Yes. Leave `raw_levels` unset and enable `auto_levels(true)`. Adjust `hysteresis
 
 **What units does `read(role)` return?**  
 Your configured **output range** (e.g., `-100..+100` or `0..100`).
+
+**Can I read defensively when a role/index may be unchecked?**
+Yes. Use `read_or(role, fallback)` or `read_by_index_or(index, fallback)` when the value might come from external data.
 
 ---
 

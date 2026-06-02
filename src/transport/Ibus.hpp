@@ -11,6 +11,7 @@
 
 #pragma once
 
+#include <Arduino.h>
 #include <cstdint>
 #include <Types.hpp>
 #include <Constants.hpp>
