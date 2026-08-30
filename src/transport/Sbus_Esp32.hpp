@@ -1,230 +1,165 @@
 /**
  * MIT License
  *
- * @brief Minimal SBUS transport for ESP32/ESP32-S3 using inverted UART (100000 8E2).
+ * @brief ESP32 SBUS transport using inverted 100000-baud 8E2 UART reception.
  *
  * @file Sbus_Esp32.hpp
  * @author Little Man Builds (Darren Osborne)
- * @date 2025-10-03
- * @copyright Copyright © 2026 Little Man Builds
+ * @date 2025-10-08
+ * @copyright Copyright (c) 2026 Little Man Builds
+ *
  */
 
 #pragma once
 
+#if defined(ARDUINO_ARCH_ESP32) || defined(ESP32)
+
+#include "transport/detail/SbusDecoder.hpp"
+#include "Types.hpp"
+
 #include <Arduino.h>
+
 #include <cstdint>
-#include <Types.hpp>
-#include <Constants.hpp>
 
 namespace rc
 {
-    /**
-     * @brief SBUS transport (25-byte frames). Exposes protocol flags.
+/**
+     * @brief ESP32 SBUS receiver transport.
+     *
+     * The UART inversion path is intentionally ESP32-specific. The decoder itself
+     * remains hardware-neutral and is host-tested independently.
      */
-    class RcSbusEsp32Transport
+class RcSbusEsp32Transport
+{
+  public:
+    /**
+         * @brief Start SBUS on an inverted ESP32 UART.
+         *
+         * @tparam SerialT ESP32 HardwareSerial-compatible type.
+         * @param port Serial object used for receiver input.
+         * @param baud Ignored; SBUS is fixed at 100000 baud.
+         * @param rxPin RX GPIO.
+         * @param txPin Unused for receive-only SBUS.
+         */
+    template <typename SerialT> void begin(SerialT &port, std::uint32_t baud, int rxPin, int txPin)
     {
-    public:
-        /**
-         * @brief Initialize SBUS on an inverted UART.
+        (void)baud;
+        (void)txPin;
+        port.begin(100000UL, SERIAL_8E2, rxPin, -1, true);
+        port_ = &port;
+        decoder_.reset();
+    }
+
+    /**
+         * @brief Drain available SBUS bytes.
          *
-         * SBUS uses 100000 baud, 8E2, inverted logic.
-         *
-         * @param port Hardware serial reference.
-         * @param baud Ignored; SBUS is fixed at 100000 8E2.
-         * @param rxPin RX pin.
-         * @param txPin TX pin (unused).
+         * @param now_ms Timestamp used for parser timeout accounting.
+         * @return True when one or more valid frames were decoded.
          */
-        void begin(::HardwareSerial &port, std::uint32_t /*baud*/, int rxPin, int txPin)
+    bool update(std::uint32_t now_ms)
+    {
+        bool new_frame = false;
+        decoder_.tick(now_ms);
+        while (port_ && port_->available() > 0)
         {
-            (void)txPin; ///< TX unused.
-            port_ = &port;
-            // SBUS: 100000 baud, 8E2, inverted.
-            port_->begin(100000, SERIAL_8E2, rxPin, -1, true);
-            reset();
+            const int value = port_->read();
+            if (value >= 0)
+                new_frame = decoder_.feed(static_cast<std::uint8_t>(value), now_ms) || new_frame;
         }
+        return new_frame;
+    }
 
-        /**
-         * @brief Parse UART input; return true when a complete new frame is ready.
-         * @return true if a full 25-byte SBUS frame was parsed; false otherwise.
+    /**
+         * @brief Arduino convenience overload using millis().
          */
-        bool update()
-        {
-            bool new_frame = false;
-            while (port_ && port_->available())
-            {
-                const std::uint8_t b = static_cast<std::uint8_t>(port_->read());
-                switch (st_)
-                {
-                case S::kWaitStart:
-                    if (b == 0x0F)
-                    {
-                        idx_ = 0;
-                        buf_[idx_++] = b;
-                        st_ = S::kPayload;
-                    }
-                    break;
+    bool update()
+    {
+        return update(static_cast<std::uint32_t>(millis()));
+    }
 
-                case S::kPayload:
-                    buf_[idx_++] = b;
-                    if (idx_ == kBuf)
-                    {
-                        if (validate())
-                        {
-                            parse_frame();
-                            last_good_ms_ = millis();
-                            frames_++;
-                            new_frame = true;
-                        }
-                        else
-                        {
-                            crc_errors_++;
-                        }
-                        reset();
-                    }
-                    break;
-                }
-            }
-            return new_frame;
-        }
+    /// @brief Return the standard SBUS analogue channel count.
+    int channels() const noexcept
+    {
+        return decoder_.channels();
+    }
 
-        /**
-         * @brief Number of channels provided by SBUS.
-         * @return Always 16 for standard SBUS.
+    /// @brief Read one decoded SBUS channel in approximate microseconds.
+    int readRaw(int ch) const noexcept
+    {
+        return decoder_.readRaw(ch);
+    }
+
+    /// @brief Return the receiver failsafe flag from the last accepted frame.
+    bool protoFailsafe() const noexcept
+    {
+        return decoder_.protoFailsafe();
+    }
+
+    /// @brief Return the frame-lost flag from the last accepted frame.
+    bool frameLost() const noexcept
+    {
+        return decoder_.frameLost();
+    }
+
+    /// @brief Return the accepted frame count.
+    std::uint32_t frames() const noexcept
+    {
+        return decoder_.frames();
+    }
+
+    /// @brief Return the invalid-footer count exposed as the checksum diagnostic.
+    std::uint32_t crcErrors() const noexcept
+    {
+        return decoder_.crcErrors();
+    }
+
+    /// @brief Return the parser recovery count.
+    std::uint32_t parseErrors() const noexcept
+    {
+        return decoder_.parseErrors();
+    }
+
+    /// @brief Return the partial-frame timeout count.
+    std::uint32_t parserTimeouts() const noexcept
+    {
+        return decoder_.parserTimeouts();
+    }
+
+    /// @brief Return bytes discarded during parser recovery.
+    std::uint32_t discardedBytes() const noexcept
+    {
+        return decoder_.discardedBytes();
+    }
+
+    /// @brief Return validity bits for the analogue channels.
+    std::uint32_t channelValidMask() const noexcept
+    {
+        return decoder_.channelValidMask();
+    }
+
+    /// @brief Return the timestamp of the last accepted frame.
+    std::uint32_t lastGoodMs() const noexcept
+    {
+        return decoder_.lastGoodMs();
+    }
+
+    /**
+         * @brief Describe SBUS transport capabilities.
          */
-        int channels() const { return kSbusChannels; }
+    RcTransportCaps caps() const noexcept
+    {
+        RcTransportCaps c;
+        c.has_proto_failsafe = true;
+        c.has_link_stats = false;
+        c.has_telemetry = false;
+        c.half_duplex = false;
+        return c;
+    }
 
-        /**
-         * @brief Read a raw channel in microseconds.
-         * @param ch Channel index [0..15].
-         * @return Channel value in microseconds (~1000..2000), or 0 if out of range.
-         */
-        int readRaw(int ch) const { return (ch >= 0 && ch < kSbusChannels) ? ch_us_[ch] : 0; }
+  private:
+    Stream *port_{nullptr};         ///< Attached ESP32 byte stream.
+    detail::SbusDecoder decoder_{}; ///< Hardware-neutral parser/decoder.
+};
+} // namespace rc
 
-        /**
-         * @brief Protocol-level failsafe flag as exposed by SBUS.
-         * @return true if SBUS failsafe is active.
-         */
-        bool protoFailsafe() const { return fs_flag_; }
-
-        /**
-         * @brief Protocol-level frame-lost flag as exposed by SBUS.
-         * @return true if SBUS signaled a lost frame.
-         */
-        bool frameLost() const { return fl_flag_; }
-
-        /**
-         * @brief Total number of valid frames parsed.
-         * @return Frame count.
-         */
-        std::uint32_t frames() const { return frames_; }
-
-        /**
-         * @brief Number of rejected frame-like packets.
-         * @return Error count. SBUS has no CRC, so this counts invalid footers.
-         */
-        std::uint32_t crcErrors() const { return crc_errors_; }
-
-        /**
-         * @brief Timestamp (ms) of the last valid frame.
-         * @return Milliseconds since boot of last valid frame.
-         */
-        std::uint32_t lastGoodMs() const { return last_good_ms_; }
-
-        /**
-         * @brief Capability flags for this transport.
-         * @return Transport capability structure.
-         */
-        RcTransportCaps caps() const
-        {
-            RcTransportCaps c;
-            c.has_proto_failsafe = true;
-            c.has_link_stats = false;
-            c.has_telemetry = false;
-            c.half_duplex = false;
-            return c;
-        }
-
-    private:
-        enum class S : std::uint8_t
-        {
-            kWaitStart, ///< Waiting for frame start byte 0x0F.
-            kPayload    ///< Reading payload bytes until full frame is collected.
-        };
-
-        /// @brief Reset parser state for the next frame.
-        void reset()
-        {
-            st_ = S::kWaitStart;
-            idx_ = 0;
-        }
-
-        /// @brief Validate frame delimiter bytes.
-        /// @return true if the frame uses a known SBUS/SBUS2 footer.
-        bool validate() const
-        {
-            if (buf_[0] != 0x0F)
-                return false;
-
-            // Standard SBUS ends with 0x00. Some SBUS2 receivers use slot footers.
-            const std::uint8_t footer = buf_[kBuf - 1];
-            return footer == 0x00 || footer == 0x04 || footer == 0x14 ||
-                   footer == 0x24 || footer == 0x34;
-        }
-
-        /// @brief Decode one complete SBUS frame in @p buf_ into @p ch_us_ and flags.
-        void parse_frame()
-        {
-            // buf_[0] = 0x0F, total 25 bytes.
-            const std::uint8_t *d = buf_ + 1;
-            std::uint16_t ch[16];
-            ch[0] = (d[0] | (d[1] << 8)) & 0x07FF;
-            ch[1] = ((d[1] >> 3) | (d[2] << 5)) & 0x07FF;
-            ch[2] = ((d[2] >> 6) | (d[3] << 2) | (d[4] << 10)) & 0x07FF;
-            ch[3] = ((d[4] >> 1) | (d[5] << 7)) & 0x07FF;
-            ch[4] = ((d[5] >> 4) | (d[6] << 4)) & 0x07FF;
-            ch[5] = ((d[6] >> 7) | (d[7] << 1) | (d[8] << 9)) & 0x07FF;
-            ch[6] = ((d[8] >> 2) | (d[9] << 6)) & 0x07FF;
-            ch[7] = ((d[9] >> 5) | (d[10] << 3)) & 0x07FF;
-            ch[8] = (d[11] | (d[12] << 8)) & 0x07FF;
-            ch[9] = ((d[12] >> 3) | (d[13] << 5)) & 0x07FF;
-            ch[10] = ((d[13] >> 6) | (d[14] << 2) | (d[15] << 10)) & 0x07FF;
-            ch[11] = ((d[15] >> 1) | (d[16] << 7)) & 0x07FF;
-            ch[12] = ((d[16] >> 4) | (d[17] << 4)) & 0x07FF;
-            ch[13] = ((d[17] >> 7) | (d[18] << 1) | (d[19] << 9)) & 0x07FF;
-            ch[14] = ((d[19] >> 2) | (d[20] << 6)) & 0x07FF;
-            ch[15] = ((d[20] >> 5) | (d[21] << 3)) & 0x07FF;
-
-            // Flags (d[22]).
-            const std::uint8_t flags = d[22];
-            fl_flag_ = (flags & (1u << 2)) != 0u; // Frame lost.
-            fs_flag_ = (flags & (1u << 3)) != 0u; // Failsafe.
-
-            // Convert 11-bit SBUS range (172..1811) to microseconds (~1000..2000).
-            for (int i = 0; i < 16; ++i)
-            {
-                const int v = static_cast<int>(ch[i]);
-                int us = 1000 + ((v - 172) * 1000) / 1639;
-                if (us < 800)
-                    us = 800;
-                if (us > 2200)
-                    us = 2200;
-                ch_us_[i] = us;
-            }
-        }
-
-    private:
-        static constexpr int kBuf = 25; ///< SBUS frame size in bytes.
-
-        ::HardwareSerial *port_{nullptr}; ///< UART used by transport.
-        S st_{S::kWaitStart};             ///< Parser state.
-        std::uint8_t buf_[kBuf]{};        ///< Frame buffer.
-        std::uint8_t idx_{0};             ///< Buffer index.
-        bool fs_flag_{false};             ///< Protocol failsafe bit.
-        bool fl_flag_{false};             ///< Protocol frame-lost bit.
-        int ch_us_[kSbusChannels]{};      ///< Channels in microseconds.
-        std::uint32_t frames_{0};         ///< Valid frames.
-        std::uint32_t crc_errors_{0};     ///< Invalid frame count (SBUS has no CRC).
-        std::uint32_t last_good_ms_{0};   ///< Timestamp of last frame (ms).
-    };
-
-} ///< namespace rc
+#endif // ARDUINO_ARCH_ESP32 || ESP32

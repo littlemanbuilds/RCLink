@@ -1,18 +1,48 @@
+# PlatformIO / Arduino build output
 .pio/
-.vscode/
+.pioenvs/
+.piolibdeps/
+build/
 
+# IDE / editor files
+.vscode/
+.idea/
+*.code-workspace
+
+# OS metadata
 .DS_Store
+._*
 __MACOSX/
 
+# Compiler / linker output
+*.o
+*.obj
+*.a
+*.elf
+*.bin
+*.hex
+*.map
+*.d
+compile_commands.json
+
+# Test / coverage output
+test/build/
+coverage/
+*.gcda
+*.gcno
+*.gcov
+
+# Local release archives
 *.zip
 *.ZIP
 
-compile_commands.json
-
-*.o
-*.elf
-*.bin
-*.map
-*.hex
-*.a
-*.d
+# LMB required shared ignores
+AGENTS.md
+.lmb/
+Thumbs.db
+*.out
+*.log
+cmake-build-*/
+.native-build/
+tests/build/
+.test-results/

@@ -1,39 +1,61 @@
 {
   "name": "RCLink",
-  "version": "1.1.0",
-  "description": "Header-only RC link for ESP32 Arduino with iBUS and ESP32-only SBUS transports, per-channel shaping, filtering, JSON config, and one-line failsafe signature helpers.",
+  "version": "1.2.0",
+  "description": "Validated Arduino RC receiver mapping with portable iBUS, ESP32 SBUS, shaping, filtering, channel health, and failsafe handling.",
   "keywords": [
     "rc",
     "ibus",
     "sbus",
-    "radio",
     "receiver",
-    "esp32",
-    "arduino",
     "failsafe",
-    "joystick"
+    "esp32",
+    "arduino"
   ],
   "repository": {
     "type": "git",
     "url": "https://github.com/littlemanbuilds/RCLink"
   },
+  "homepage": "https://github.com/littlemanbuilds/RCLink",
   "authors": [
     {
-      "name": "Little Man Builds",
+      "name": "Little Man Builds (Darren Osborne)",
       "email": "littlemanbuilds@gmail.com",
       "maintainer": true
     }
   ],
-  "frameworks": ["arduino"],
-  "platforms": ["espressif32"],
+  "frameworks": [
+    "arduino"
+  ],
+  "headers": "RCLink.h",
+  "platforms": [
+    "atmelsam",
+    "espressif32",
+    "espressif8266",
+    "raspberrypi",
+    "ststm32",
+    "teensy"
+  ],
+  "examples": [
+    "examples/01_BasicIbusLink/01_BasicIbusLink.ino",
+    "examples/02_IbusCalibration/02_IbusCalibration.ino",
+    "examples/03_FlyskyFSi6XDemo/03_FlyskyFSi6XDemo.ino",
+    "examples/04_JsonConfigDemo/04_JsonConfigDemo.ino",
+    "examples/05_AdvancedFeatureDemo/05_AdvancedFeatureDemo.ino"
+  ],
   "export": {
     "include": [
       "src",
       "examples",
+      "test",
+      ".github",
       "README.md",
+      "CHANGELOG.md",
+      "RELEASE_CHECKLIST.md",
       "LICENSE",
       "keywords.txt",
-      "library.properties"
+      "library.properties",
+      "library.json",
+      "platformio.ini"
     ]
   },
   "dependencies": [
@@ -41,7 +63,9 @@
       "name": "ArduinoJson",
       "owner": "bblanchon",
       "version": "^7.4.2",
-      "frameworks": ["arduino"]
+      "frameworks": [
+        "arduino"
+      ]
     }
   ],
   "license": "MIT"

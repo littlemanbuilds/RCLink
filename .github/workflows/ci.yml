@@ -1,0 +1,86 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  native:
+    name: Native host checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Native tests with GCC
+        run: bash test/run_native_tests.sh
+        env:
+          CXX: g++
+
+      - name: Native tests with Clang
+        run: bash test/run_native_tests.sh
+        env:
+          CXX: clang++
+
+      - name: Sanitizers
+        run: bash test/run_sanitizers.sh
+
+      - name: Release contracts
+        run: bash test/check_release_contracts.sh
+
+      - name: Staged distribution contracts
+        run: bash test/check_distribution.sh
+
+  portable:
+    name: Portable compile (${{ matrix.env }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        env:
+          - esp32-s3-devkitc-1
+          - esp8266_nodemcuv2
+          - pico
+          - mkrzero
+          - due
+          - teensy41
+          - bluepill_f103c8
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.x"
+
+      - name: Install PlatformIO
+        run: python -m pip install platformio==6.1.19
+
+      - name: Compile portable smoke sketch
+        run: pio run -e "${{ matrix.env }}"
+
+  examples:
+    name: ESP32-S3 examples (${{ matrix.example }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        example:
+          - examples/01_BasicIbusLink/01_BasicIbusLink.ino
+          - examples/02_IbusCalibration/02_IbusCalibration.ino
+          - examples/03_FlyskyFSi6XDemo/03_FlyskyFSi6XDemo.ino
+          - examples/04_JsonConfigDemo/04_JsonConfigDemo.ino
+          - examples/05_AdvancedFeatureDemo/05_AdvancedFeatureDemo.ino
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.x"
+
+      - name: Install PlatformIO
+        run: python -m pip install platformio==6.1.19
+
+      - name: Compile example
+        run: PLATFORMIO_SRC_DIR="$(dirname '${{ matrix.example }}')" pio run -e esp32-s3-devkitc-1
