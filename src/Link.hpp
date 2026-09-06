@@ -28,13 +28,26 @@ namespace rc
 {
 namespace detail
 {
-/// @brief Compute a wrapping unsigned sequence difference.
+/**
+ * @brief Compute a wrapping unsigned sequence difference.
+ *
+ * @param current Current unsigned sequence.
+ * @param previous Earlier unsigned sequence.
+ * @return Sequence difference modulo 2^32.
+ */
 constexpr std::uint32_t sequence_delta(std::uint32_t current, std::uint32_t previous) noexcept
 {
     return static_cast<std::uint32_t>(current - previous);
 }
 
-/// @brief Prefer a timestamp-aware transport update overload when available.
+/**
+ * @brief Prefer a timestamp-aware transport update overload when available.
+ *
+ * @tparam Transport Receiver transport type; optional methods are selected by overload resolution.
+ * @param transport Receiver transport to query or service.
+ * @param now_ms Current millisecond timestamp passed to the transport.
+ * @return Transport update result converted to bool; true indicates newly accepted data.
+ */
 template <typename Transport>
 auto transport_update(Transport &transport, std::uint32_t now_ms, int)
     -> decltype(static_cast<bool>(transport.update(now_ms)))
@@ -42,26 +55,49 @@ auto transport_update(Transport &transport, std::uint32_t now_ms, int)
     return static_cast<bool>(transport.update(now_ms));
 }
 
-/// @brief Fall back to a transport update overload without a timestamp.
+/**
+ * @brief Fall back to a transport update overload without a timestamp.
+ *
+ * @tparam Transport Receiver transport type; optional methods are selected by overload resolution.
+ * @param transport Receiver transport to query or service.
+ * @return Transport update result converted to bool; true indicates newly accepted data.
+ */
 template <typename Transport> bool transport_update(Transport &transport, std::uint32_t, long)
 {
     return static_cast<bool>(transport.update());
 }
 
-/// @brief Read the transport-reported channel count when available.
+/**
+ * @brief Read the transport-reported channel count when available.
+ *
+ * @tparam Transport Receiver transport type; optional methods are selected by overload resolution.
+ * @param transport Receiver transport to query or service.
+ * @return Transport channel count converted to int; the caller must bound it.
+ */
 template <typename Transport>
 auto transport_channels(const Transport &transport, int) -> decltype(static_cast<int>(transport.channels()))
 {
     return static_cast<int>(transport.channels());
 }
 
-/// @brief Supply the library channel limit when a transport has no count diagnostic.
+/**
+ * @brief Supply the library channel limit when a transport has no count diagnostic.
+ *
+ * @tparam Transport Receiver transport type; optional methods are selected by overload resolution.
+ * @return kRcMaxReceiverChannels as the compatibility fallback.
+ */
 template <typename Transport> int transport_channels(const Transport &, long)
 {
     return static_cast<int>(kRcMaxReceiverChannels);
 }
 
-/// @brief Read the transport channel-validity mask when available.
+/**
+ * @brief Read the transport channel-validity mask when available.
+ *
+ * @tparam Transport Receiver transport type; optional methods are selected by overload resolution.
+ * @param transport Receiver transport to query or service.
+ * @return Channel validity bits reported by the transport.
+ */
 template <typename Transport>
 auto transport_valid_mask(const Transport &transport, int)
     -> decltype(static_cast<std::uint32_t>(transport.channelValidMask()))
@@ -69,7 +105,13 @@ auto transport_valid_mask(const Transport &transport, int)
     return static_cast<std::uint32_t>(transport.channelValidMask());
 }
 
-/// @brief Infer contiguous valid channels when a transport has no validity mask.
+/**
+ * @brief Infer contiguous valid channels when a transport has no validity mask.
+ *
+ * @tparam Transport Receiver transport type; optional methods are selected by overload resolution.
+ * @param transport Receiver transport to query or service.
+ * @return Low contiguous bits inferred from the channel count; no freshness evidence.
+ */
 template <typename Transport> std::uint32_t transport_valid_mask(const Transport &transport, long)
 {
     int count = transport_channels(transport, 0);
@@ -80,20 +122,37 @@ template <typename Transport> std::uint32_t transport_valid_mask(const Transport
     return (1u << static_cast<unsigned>(count)) - 1u;
 }
 
-/// @brief Read the optional transport frame diagnostic when available.
+/**
+ * @brief Read the optional transport frame diagnostic when available.
+ *
+ * @tparam Transport Receiver transport type; optional methods are selected by overload resolution.
+ * @param transport Receiver transport to query or service.
+ * @return Transport cumulative diagnostic converted to uint32_t.
+ */
 template <typename Transport>
 auto transport_frames(const Transport &transport, int) -> decltype(static_cast<std::uint32_t>(transport.frames()))
 {
     return static_cast<std::uint32_t>(transport.frames());
 }
 
-/// @brief Supply zero when a transport has no frame diagnostic.
+/**
+ * @brief Supply zero when a transport has no frame diagnostic.
+ *
+ * @tparam Transport Receiver transport type; optional methods are selected by overload resolution.
+ * @return Zero, indicating the optional diagnostic is unavailable.
+ */
 template <typename Transport> std::uint32_t transport_frames(const Transport &, long)
 {
     return 0u;
 }
 
-/// @brief Read the optional transport checksum-error diagnostic when available.
+/**
+ * @brief Read the optional transport checksum-error diagnostic when available.
+ *
+ * @tparam Transport Receiver transport type; optional methods are selected by overload resolution.
+ * @param transport Receiver transport to query or service.
+ * @return Transport cumulative diagnostic converted to uint32_t.
+ */
 template <typename Transport>
 auto transport_crc_errors(const Transport &transport, int)
     -> decltype(static_cast<std::uint32_t>(transport.crcErrors()))
@@ -101,13 +160,24 @@ auto transport_crc_errors(const Transport &transport, int)
     return static_cast<std::uint32_t>(transport.crcErrors());
 }
 
-/// @brief Supply zero when a transport has no checksum-error diagnostic.
+/**
+ * @brief Supply zero when a transport has no checksum-error diagnostic.
+ *
+ * @tparam Transport Receiver transport type; optional methods are selected by overload resolution.
+ * @return Zero, indicating the optional diagnostic is unavailable.
+ */
 template <typename Transport> std::uint32_t transport_crc_errors(const Transport &, long)
 {
     return 0u;
 }
 
-/// @brief Read the optional transport parse-error diagnostic when available.
+/**
+ * @brief Read the optional transport parse-error diagnostic when available.
+ *
+ * @tparam Transport Receiver transport type; optional methods are selected by overload resolution.
+ * @param transport Receiver transport to query or service.
+ * @return Transport cumulative diagnostic converted to uint32_t.
+ */
 template <typename Transport>
 auto transport_parse_errors(const Transport &transport, int)
     -> decltype(static_cast<std::uint32_t>(transport.parseErrors()))
@@ -115,13 +185,24 @@ auto transport_parse_errors(const Transport &transport, int)
     return static_cast<std::uint32_t>(transport.parseErrors());
 }
 
-/// @brief Supply zero when a transport has no parse-error diagnostic.
+/**
+ * @brief Supply zero when a transport has no parse-error diagnostic.
+ *
+ * @tparam Transport Receiver transport type; optional methods are selected by overload resolution.
+ * @return Zero, indicating the optional diagnostic is unavailable.
+ */
 template <typename Transport> std::uint32_t transport_parse_errors(const Transport &, long)
 {
     return 0u;
 }
 
-/// @brief Read the optional parser-timeout diagnostic when available.
+/**
+ * @brief Read the optional parser-timeout diagnostic when available.
+ *
+ * @tparam Transport Receiver transport type; optional methods are selected by overload resolution.
+ * @param transport Receiver transport to query or service.
+ * @return Transport cumulative diagnostic converted to uint32_t.
+ */
 template <typename Transport>
 auto transport_parser_timeouts(const Transport &transport, int)
     -> decltype(static_cast<std::uint32_t>(transport.parserTimeouts()))
@@ -129,13 +210,24 @@ auto transport_parser_timeouts(const Transport &transport, int)
     return static_cast<std::uint32_t>(transport.parserTimeouts());
 }
 
-/// @brief Supply zero when a transport has no parser-timeout diagnostic.
+/**
+ * @brief Supply zero when a transport has no parser-timeout diagnostic.
+ *
+ * @tparam Transport Receiver transport type; optional methods are selected by overload resolution.
+ * @return Zero, indicating the optional diagnostic is unavailable.
+ */
 template <typename Transport> std::uint32_t transport_parser_timeouts(const Transport &, long)
 {
     return 0u;
 }
 
-/// @brief Read the optional discarded-byte diagnostic when available.
+/**
+ * @brief Read the optional discarded-byte diagnostic when available.
+ *
+ * @tparam Transport Receiver transport type; optional methods are selected by overload resolution.
+ * @param transport Receiver transport to query or service.
+ * @return Transport cumulative diagnostic converted to uint32_t.
+ */
 template <typename Transport>
 auto transport_discarded_bytes(const Transport &transport, int)
     -> decltype(static_cast<std::uint32_t>(transport.discardedBytes()))
@@ -143,7 +235,12 @@ auto transport_discarded_bytes(const Transport &transport, int)
     return static_cast<std::uint32_t>(transport.discardedBytes());
 }
 
-/// @brief Supply zero when a transport has no discarded-byte diagnostic.
+/**
+ * @brief Supply zero when a transport has no discarded-byte diagnostic.
+ *
+ * @tparam Transport Receiver transport type; optional methods are selected by overload resolution.
+ * @return Zero, indicating the optional diagnostic is unavailable.
+ */
 template <typename Transport> std::uint32_t transport_discarded_bytes(const Transport &, long)
 {
     return 0u;
@@ -151,16 +248,16 @@ template <typename Transport> std::uint32_t transport_discarded_bytes(const Tran
 } // namespace detail
 
 /**
-     * @brief Map receiver transport channels into validated logical application roles.
-     *
-     * RcLink deliberately separates transport freshness from logical-role validity.
-     * A frame can be fresh while still being unusable because a mapped channel is
-     * missing. Required-role failure therefore fails closed instead of synthesizing
-     * a plausible neutral command.
-     *
-     * @tparam Transport Receiver transport providing update/readRaw/protocol status methods.
-     * @tparam E Logical role enum ending in `Count`.
-     */
+ * @brief Map receiver transport channels into validated logical application roles.
+ *
+ * RcLink deliberately separates transport freshness from logical-role validity.
+ * A frame can be fresh while still being unusable because a mapped channel is
+ * missing. Required-role failure therefore fails closed instead of synthesizing
+ * a plausible neutral command.
+ *
+ * @tparam Transport Receiver transport providing update/readRaw/protocol status methods.
+ * @tparam E Logical role enum ending in `Count`.
+ */
 template <class Transport, typename E> class RcLink
 {
   public:
@@ -171,21 +268,21 @@ template <class Transport, typename E> class RcLink
     static_assert(kRcMaxSwitchVals >= 2u && kRcMaxSwitchVals <= 16u, "RcLink: kRcMaxSwitchVals must be in [2..16].");
 
     /**
-         * @brief Construct a link around a transport instance.
-         *
-         * @param transport Transport reference; RCLink does not own it.
-         */
+     * @brief Construct a link around a transport instance.
+     *
+     * @param transport Transport reference; RCLink does not own it.
+     */
     explicit RcLink(Transport &transport) noexcept : tx_(transport) {}
 
     /**
-         * @brief Initialize the transport using its existing begin() contract.
-         *
-         * @tparam SerialT Serial type accepted by the selected transport.
-         * @param port Serial/UART object.
-         * @param baud Requested baud rate.
-         * @param rxPin Receiver input pin.
-         * @param txPin Optional transmit pin.
-         */
+     * @brief Initialize the transport using its existing begin() contract.
+     *
+     * @tparam SerialT Serial type accepted by the selected transport.
+     * @param port Serial/UART object.
+     * @param baud Requested baud rate.
+     * @param rxPin Receiver input pin.
+     * @param txPin Optional transmit pin.
+     */
     template <typename SerialT> void begin(SerialT &port, std::uint32_t baud, int rxPin, int txPin)
     {
         tx_.begin(port, baud, rxPin, txPin);
@@ -193,14 +290,14 @@ template <class Transport, typename E> class RcLink
     }
 
     /**
-         * @brief Validate and activate a complete logical-role configuration.
-         *
-         * @param config Configuration to activate.
-         * @return Detailed validation result.
-         *
-         * Existing code may continue to ignore the return value. Invalid
-         * configurations remain fail-closed and expose zero until corrected.
-         */
+     * @brief Validate and activate a complete logical-role configuration.
+     *
+     * @param config Configuration to activate.
+     * @return Detailed validation result.
+     *
+     * Existing code may continue to ignore the return value. Invalid
+     * configurations remain fail-closed and expose zero until corrected.
+     */
     RcConfigResult apply_config(const RcConfig<E> &config)
     {
         cfg_ = config;
@@ -236,11 +333,11 @@ template <class Transport, typename E> class RcLink
     }
 
     /**
-         * @brief Configure a receiver-failsafe signature.
-         *
-         * @param rule Signature rule in scaled application space.
-         * @return Validation result; an empty check mask is rejected.
-         */
+     * @brief Configure a receiver-failsafe signature.
+     *
+     * @param rule Signature rule in scaled application space.
+     * @return Validation result; an empty check mask is rejected.
+     */
     RcSignatureResult set_failsafe_signature(const RcFailsafeRule<N> &rule) noexcept
     {
         bool any = false;
@@ -260,8 +357,8 @@ template <class Transport, typename E> class RcLink
     }
 
     /**
-         * @brief Disable receiver-failsafe signature matching.
-         */
+     * @brief Disable receiver-failsafe signature matching.
+     */
     void clear_failsafe_signature() noexcept
     {
         fsig_set_ = false;
@@ -269,18 +366,20 @@ template <class Transport, typename E> class RcLink
     }
 
     /**
-         * @brief Return the currently stored receiver-failsafe signature.
-         */
+     * @brief Return the currently stored receiver-failsafe signature.
+     *
+     * @return Link-owned stored rule; disabling matching does not erase it.
+     */
     const RcFailsafeRule<N> &failsafe_signature() const noexcept
     {
         return fsig_;
     }
 
     /**
-         * @brief Build the configured expected failsafe frame.
-         *
-         * @return Expected values for checked roles; current outputs elsewhere.
-         */
+     * @brief Build the configured expected failsafe frame.
+     *
+     * @return Expected values for checked roles; current outputs elsewhere.
+     */
     RcFrame<N> failsafe_expected_frame() const noexcept
     {
         RcFrame<N> frame{};
@@ -290,31 +389,35 @@ template <class Transport, typename E> class RcLink
     }
 
     /**
-         * @brief Select whether a confirmed receiver signature applies configured failsafe outputs.
-         *
-         * @param enable True to fail outputs on signature detection; false to report only.
-         *
-         * Link staleness, missing required roles, invalid configuration, and protocol
-         * failsafe always fail closed regardless of this policy.
-         */
+     * @brief Select whether a confirmed receiver signature applies configured failsafe outputs.
+     *
+     * @param enable True to fail outputs on signature detection; false to report only.
+     *
+     * Link staleness, missing required roles, invalid configuration, and protocol
+     * failsafe always fail closed regardless of this policy.
+     */
     void apply_rxfs_outputs(bool enable) noexcept
     {
         rxfs_apply_outputs_ = enable;
     }
 
-    /// @brief Return whether signature confirmation applies configured failsafe outputs.
+    /**
+     * @brief Return whether signature confirmation applies configured failsafe outputs.
+     *
+     * @return True when confirmed signatures trigger configured failsafe outputs.
+     */
     bool is_apply_rxfs_outputs() const noexcept
     {
         return rxfs_apply_outputs_;
     }
 
     /**
-         * @brief Change an active axis EMA coefficient safely.
-         *
-         * @param role Logical role.
-         * @param alpha Filter alpha in [0,1].
-         * @return True when the update was accepted.
-         */
+     * @brief Change an active axis EMA coefficient safely.
+     *
+     * @param role Logical role.
+     * @param alpha Filter alpha in [0,1].
+     * @return True when the update was accepted.
+     */
     bool set_axis_filter(E role, float alpha) noexcept
     {
         const std::size_t i = static_cast<std::size_t>(role);
@@ -329,16 +432,16 @@ template <class Transport, typename E> class RcLink
     }
 
     /**
-         * @brief Enable or disable commissioning-time adaptive switch learning.
-         *
-         * @param enable True only while intentionally commissioning learnable switches.
-         * @return True if learning was enabled or disabled successfully.
-         *
-         * `RcSwitchSpec::auto_levels` merely marks a role as learnable. No centroid
-         * movement occurs in normal service unless this runtime gate is enabled.
-         * Enabling starts a new commissioning session and clears prior position-
-         * observation evidence for every learnable switch.
-         */
+     * @brief Enable or disable commissioning-time adaptive switch learning.
+     *
+     * @param enable True only while intentionally commissioning learnable switches.
+     * @return True if learning was enabled or disabled successfully.
+     *
+     * `RcSwitchSpec::auto_levels` merely marks a role as learnable. No centroid
+     * movement occurs in normal service unless this runtime gate is enabled.
+     * Enabling starts a new commissioning session and clears prior position-
+     * observation evidence for every learnable switch.
+     */
     bool set_switch_learning_enabled(bool enable) noexcept
     {
         if (enable && !config_valid_)
@@ -359,21 +462,25 @@ template <class Transport, typename E> class RcLink
         return true;
     }
 
-    /// @brief Return whether commissioning-time switch learning is enabled.
+    /**
+     * @brief Return whether commissioning-time switch learning is enabled.
+     *
+     * @return Current explicit commissioning gate.
+     */
     bool switch_learning_enabled() const noexcept
     {
         return switch_learning_enabled_;
     }
 
     /**
-         * @brief Stop adaptive learning and finalize observed switch positions.
-         *
-         * Every configured position of every learnable switch must have been
-         * selected by valid receiver evidence during the current learning session,
-         * and the resulting centroids must retain their configured separation.
-         *
-         * @return True when observation and separation requirements are satisfied.
-         */
+     * @brief Stop adaptive learning and finalize observed switch positions.
+     *
+     * Every configured position of every learnable switch must have been
+     * selected by valid receiver evidence during the current learning session,
+     * and the resulting centroids must retain their configured separation.
+     *
+     * @return True when observation and separation requirements are satisfied.
+     */
     bool finalize_switch_learning() noexcept
     {
         switch_learning_enabled_ = false;
@@ -396,16 +503,16 @@ template <class Transport, typename E> class RcLink
     }
 
     /**
-         * @brief Copy the current learned/frozen raw levels for one switch role.
-         *
-         * @param role Logical switch role.
-         * @param out Caller-provided raw-level buffer.
-         * @param capacity Number of elements available in @p out.
-         * @return Number of copied levels; zero on invalid input.
-         *
-         * RCLink intentionally does not persist data itself. Applications may store
-         * these values with any persistence layer and later feed them to raw_levels().
-         */
+     * @brief Copy the current learned/frozen raw levels for one switch role.
+     *
+     * @param role Logical switch role.
+     * @param out Caller-provided raw-level buffer.
+     * @param capacity Number of elements available in @p out.
+     * @return Number of copied levels; zero on invalid input.
+     *
+     * RCLink intentionally does not persist data itself. Applications may store
+     * these values with any persistence layer and later feed them to raw_levels().
+     */
     std::size_t copy_switch_levels(E role, std::int16_t *out, std::size_t capacity) const noexcept
     {
         const std::size_t i = static_cast<std::size_t>(role);
@@ -420,10 +527,10 @@ template <class Transport, typename E> class RcLink
     }
 
     /**
-         * @brief Poll the transport and refresh RCLink state using an explicit timestamp.
-         *
-         * @param now_ms Current millisecond timestamp.
-         */
+     * @brief Poll the transport and refresh RCLink state using an explicit timestamp.
+     *
+     * @param now_ms Current millisecond timestamp.
+     */
     void update(std::uint32_t now_ms)
     {
         const bool got_frame = detail::transport_update(tx_, now_ms, 0);
@@ -477,6 +584,8 @@ template <class Transport, typename E> class RcLink
 
             const bool acceptable_frame = status_.required_roles_valid && !status_.proto_failsafe &&
                                           !status_.frame_lost && !(rxfs_apply_outputs_ && fsig_matching_);
+            // Matching signature candidates must not enter HoldLast/filter history
+            // while output enforcement is enabled, even before confirmation.
             if (acceptable_frame)
             {
                 for (std::size_t i = 0u; i < N; ++i)
@@ -540,34 +649,44 @@ template <class Transport, typename E> class RcLink
 
 #if defined(ARDUINO)
     /**
-         * @brief Arduino convenience overload using millis().
-         */
+     * @brief Arduino convenience overload using millis().
+     */
     void update()
     {
         update(static_cast<std::uint32_t>(millis()));
     }
 #endif
 
-    /// @brief Return the current safe application frame.
+    /**
+     * @brief Return the current safe application frame.
+     *
+     * @return Copy of the currently exposed outputs, including any applied failsafe policy.
+     */
     RcFrame<N> frame() const noexcept
     {
         return out_;
     }
 
     /**
-         * @brief Bounds-checked read by enum-like logical role.
-         *
-         * @param role Logical role.
-         * @return Current safe output, or zero for an invalid role.
-         */
+     * @brief Bounds-checked read by enum-like logical role.
+     *
+     * @param role Logical role.
+     * @return Current safe output, or zero for an invalid role.
+     * @tparam EnumLike Role-like type convertible to a logical index.
+     */
     template <typename EnumLike> std::int16_t read(EnumLike role) const noexcept
     {
         return read_or(role, 0);
     }
 
     /**
-         * @brief Bounds-checked read with caller-selected fallback.
-         */
+     * @brief Bounds-checked read with caller-selected fallback.
+     *
+     * @tparam EnumLike Role-like type convertible to a logical index.
+     * @param role Logical role to read.
+     * @param fallback Value returned for an out-of-range role.
+     * @return Exposed output for an in-range role, otherwise fallback; source validity is separate.
+     */
     template <typename EnumLike> std::int16_t read_or(EnumLike role, std::int16_t fallback) const noexcept
     {
         const std::size_t i = static_cast<std::size_t>(role);
@@ -575,31 +694,35 @@ template <class Transport, typename E> class RcLink
     }
 
     /**
-         * @brief Bounds-checked read by numeric logical-role index.
-         *
-         * @param index Logical role index.
-         * @return Current safe output, or zero when out of range.
-         */
+     * @brief Bounds-checked read by numeric logical-role index.
+     *
+     * @param index Logical role index.
+     * @return Current safe output, or zero when out of range.
+     */
     std::int16_t read_by_index(std::size_t index) const noexcept
     {
         return read_by_index_or(index, 0);
     }
 
     /**
-         * @brief Bounds-checked read by numeric index with fallback.
-         */
+     * @brief Bounds-checked read by numeric index with fallback.
+     *
+     * @param index Logical role index.
+     * @param fallback Value returned for an out-of-range index.
+     * @return Exposed output for an in-range index, otherwise fallback; source validity is separate.
+     */
     std::int16_t read_by_index_or(std::size_t index, std::int16_t fallback) const noexcept
     {
         return (index < N) ? out_.vals[index] : fallback;
     }
 
     /**
-         * @brief Copy a safe output only when the logical role index is valid.
-         *
-         * @param role Logical role.
-         * @param out Destination value.
-         * @return True when @p role is within the configured enum range.
-         */
+     * @brief Copy a safe output only when the logical role index is valid.
+     *
+     * @param role Logical role.
+     * @param out Destination value.
+     * @return True when @p role is within the configured enum range.
+     */
     bool try_read(E role, std::int16_t &out) const noexcept
     {
         const std::size_t i = static_cast<std::size_t>(role);
@@ -610,52 +733,72 @@ template <class Transport, typename E> class RcLink
     }
 
     /**
-         * @brief Report whether a role currently has fresh valid source data.
-         *
-         * @param role Logical role.
-         * @return True only when the latest source data is valid and the link remains fresh.
-         */
+     * @brief Report whether a role currently has fresh valid source data.
+     *
+     * @param role Logical role.
+     * @return True only when the latest source data is valid and the link remains fresh.
+     */
     bool role_valid(E role) const noexcept
     {
         const std::size_t i = static_cast<std::size_t>(role);
         return i < N && config_valid_ && status_.link_ok && role_source_valid_[i];
     }
 
-    /// @brief Return unified link, validity, failsafe, and diagnostic status.
+    /**
+     * @brief Return unified link, validity, failsafe, and diagnostic status.
+     *
+     * @return Live status reference owned by this link; later updates change its contents.
+     */
     const RcLinkStatus &status() const noexcept
     {
         return status_;
     }
 
-    /// @brief Return the backward-compatible accepted-frame freshness state.
+    /**
+     * @brief Return the backward-compatible accepted-frame freshness state.
+     *
+     * @return Whether at least one transport frame is within the freshness timeout; does not imply health.
+     */
     bool ok() const noexcept
     {
         return status_.link_ok;
     }
 
-    /// @brief Return full provider health including configuration and required roles.
+    /**
+     * @brief Return full provider health including configuration and required roles.
+     *
+     * @return True only for fresh, valid required roles with no protocol, frame-lost, or confirmed signature fault.
+     */
     bool healthy() const noexcept
     {
         return status_.healthy;
     }
 
-    /// @brief Return capability flags reported by the active transport.
+    /**
+     * @brief Return capability flags reported by the active transport.
+     *
+     * @return Link-owned capability flags captured by begin().
+     */
     const RcTransportCaps &caps() const noexcept
     {
         return caps_;
     }
 
-    /// @brief Return whether the active logical-role configuration passed validation.
+    /**
+     * @brief Return whether the active logical-role configuration passed validation.
+     *
+     * @return Whether the most recently applied configuration passed validation.
+     */
     bool config_valid() const noexcept
     {
         return config_valid_;
     }
 
     /**
-         * @brief Detect whether the exposed safe frame changed since the previous call.
-         *
-         * @return True when at least one role changed.
-         */
+     * @brief Detect whether the exposed safe frame changed since the previous call.
+     *
+     * @return True when at least one role changed.
+     */
     bool changed() noexcept
     {
         bool different = false;
@@ -673,19 +816,37 @@ template <class Transport, typename E> class RcLink
     }
 
   private:
-    /// @brief Clamp an integer to an inclusive range.
+    /**
+     * @brief Clamp an integer to an inclusive range.
+     *
+     * @param value Input integer.
+     * @param lo Inclusive lower bound; must not exceed hi.
+     * @param hi Inclusive upper bound.
+     * @return Input bounded to [lo,hi].
+     */
     static int clamp_int_(int value, int lo, int hi) noexcept
     {
         return (value < lo) ? lo : ((value > hi) ? hi : value);
     }
 
-    /// @brief Clamp a normalized floating-point value to [-1,1].
+    /**
+     * @brief Clamp a normalized floating-point value to [-1,1].
+     *
+     * @param value Finite normalized input.
+     * @return Input bounded to [-1,1].
+     */
     static float clamp_unit_(float value) noexcept
     {
         return (value < -1.0f) ? -1.0f : ((value > 1.0f) ? 1.0f : value);
     }
 
-    /// @brief Apply the configured cubic-mix expo in normalized space.
+    /**
+     * @brief Apply the configured cubic-mix expo in normalized space.
+     *
+     * @param x Normalized input in [-1,1].
+     * @param expo Validated cubic mixing factor in [0,1].
+     * @return Linear/cubic mixture, with endpoint coefficient shortcuts.
+     */
     static float apply_expo_(float x, float expo) noexcept
     {
         if (expo <= 0.0001f)
@@ -695,13 +856,22 @@ template <class Transport, typename E> class RcLink
         return (1.0f - expo) * x + expo * (x * x * x);
     }
 
-    /// @brief Round an in-range application value to the exposed int16 representation.
+    /**
+     * @brief Round an in-range application value to the exposed int16 representation.
+     *
+     * @param value Finite application value within the int16 output range.
+     * @return Nearest int16 value, with halfway cases rounded away from zero.
+     */
     static std::int16_t round_int16_(float value) noexcept
     {
         return static_cast<std::int16_t>(value >= 0.0f ? value + 0.5f : value - 0.5f);
     }
 
-    /// @brief Bound the transport-reported channel count to RCLink capacity.
+    /**
+     * @brief Bound the transport-reported channel count to RCLink capacity.
+     *
+     * @return Reported channel count clamped to [0,kRcMaxReceiverChannels].
+     */
     std::uint8_t sanitized_channel_count_() const noexcept
     {
         int count = detail::transport_channels(tx_, 0);
@@ -712,7 +882,12 @@ template <class Transport, typename E> class RcLink
         return static_cast<std::uint8_t>(count);
     }
 
-    /// @brief Determine whether one mapped role has valid source data in the current frame.
+    /**
+     * @brief Determine whether one mapped role has valid source data in the current frame.
+     *
+     * @param index Logical role index to check; out-of-range indexes are invalid.
+     * @return True for a mapped, present, mask-valid channel above the no-signal threshold; no upper plausibility bound is applied.
+     */
     bool source_role_valid_(std::size_t index) const noexcept
     {
         if (!config_valid_ || index >= N || cfg_.role_mapped[index] == 0u)
@@ -728,7 +903,13 @@ template <class Transport, typename E> class RcLink
         return raw > kNoSignalThresholdUs;
     }
 
-    /// @brief Scale one valid raw role according to its configured channel kind.
+    /**
+     * @brief Scale one valid raw role according to its configured channel kind.
+     *
+     * @param index Valid role index in an activated configuration.
+     * @param raw Available receiver value in microseconds.
+     * @return Rounded axis or switch output in application units.
+     */
     std::int16_t scale_channel_(std::size_t index, int raw)
     {
         const RcChannelSpec &spec = cfg_.specs[index];
@@ -737,7 +918,13 @@ template <class Transport, typename E> class RcLink
         return scale_switch_(index, raw);
     }
 
-    /// @brief Scale and shape one axis around its physical calibrated centre.
+    /**
+     * @brief Scale and shape one axis around its physical calibrated centre.
+     *
+     * @param index Valid configured axis index.
+     * @param raw Receiver microseconds, clamped to the calibrated endpoints.
+     * @return Rounded application output after deadband, inversion and expo.
+     */
     std::int16_t scale_axis_(std::size_t index, int raw) const noexcept
     {
         const RcAxisSpec &axis = cfg_.specs[index].axis;
@@ -773,7 +960,13 @@ template <class Transport, typename E> class RcLink
         return round_int16_(output);
     }
 
-    /// @brief Snap one switch input using explicit, learned, or evenly spaced levels.
+    /**
+     * @brief Snap one switch input using explicit, learned, or evenly spaced levels.
+     *
+     * @param index Valid configured switch index.
+     * @param raw Receiver microseconds, clamped to the calibrated endpoints.
+     * @return Nearest configured application value; learned mode also updates the active position.
+     */
     std::int16_t scale_switch_(std::size_t index, int raw)
     {
         const RcChannelSpec &spec = cfg_.specs[index];
@@ -857,7 +1050,12 @@ template <class Transport, typename E> class RcLink
         return round_int16_(sw.vals[nearest]);
     }
 
-    /// @brief Resolve the configured failsafe output for one role.
+    /**
+     * @brief Resolve the configured failsafe output for one role.
+     *
+     * @param index Valid configured role index.
+     * @return Configured value, last acceptable value, or axis endpoint; switch clamp modes use filter history.
+     */
     std::int16_t apply_failsafe_(std::size_t index) const noexcept
     {
         const RcChannelSpec &spec = cfg_.specs[index];
@@ -877,7 +1075,11 @@ template <class Transport, typename E> class RcLink
         }
     }
 
-    /// @brief Advance receiver-signature confirmation using one accepted frame.
+    /**
+     * @brief Advance receiver-signature confirmation using one accepted frame.
+     *
+     * @param now_ms Millisecond timestamp of the newly accepted transport update.
+     */
     void advance_signature_on_frame_(std::uint32_t now_ms) noexcept
     {
         if (!fsig_set_ || !config_valid_ || !status_.required_roles_valid || status_.proto_failsafe ||
@@ -905,7 +1107,11 @@ template <class Transport, typename E> class RcLink
             status_.rx_failsafe_sig = true;
     }
 
-    /// @brief Check that every role selected by the signature has valid source data.
+    /**
+     * @brief Check that every role selected by the signature has valid source data.
+     *
+     * @return True if every checked role has valid source data; an empty selection also returns true.
+     */
     bool signature_roles_valid_() const noexcept
     {
         for (std::size_t i = 0u; i < N; ++i)
@@ -916,7 +1122,11 @@ template <class Transport, typename E> class RcLink
         return true;
     }
 
-    /// @brief Compare selected scaled values with the configured receiver signature.
+    /**
+     * @brief Compare selected scaled values with the configured receiver signature.
+     *
+     * @return True if all checked unfiltered scaled values are within the inclusive tolerance.
+     */
     bool close_to_failsafe_() const noexcept
     {
         for (std::size_t i = 0u; i < N; ++i)
@@ -932,7 +1142,9 @@ template <class Transport, typename E> class RcLink
         return true;
     }
 
-    /// @brief Clear receiver-signature candidate and confirmation state.
+    /**
+     * @brief Clear receiver-signature candidate and confirmation state.
+     */
     void reset_signature_tracking_() noexcept
     {
         fsig_matching_ = false;
@@ -940,7 +1152,11 @@ template <class Transport, typename E> class RcLink
         status_.rx_failsafe_sig = false;
     }
 
-    /// @brief Record and adapt the selected centroid during an explicit learning session.
+    /**
+     * @brief Record and adapt the selected centroid during an explicit learning session.
+     *
+     * @param index Valid role index from an acceptable application frame.
+     */
     void observe_and_learn_switch_(std::size_t index) noexcept
     {
         const RcChannelSpec &spec = cfg_.specs[index];
@@ -960,7 +1176,14 @@ template <class Transport, typename E> class RcLink
         learn_centroid_(index, centroid, raw, spec.sw.learn_alpha, spec.sw.min_sep_us);
     }
 
-    /// @brief Seed evenly spaced switch centroids across a calibrated raw range.
+    /**
+     * @brief Seed evenly spaced switch centroids across a calibrated raw range.
+     *
+     * @param index Valid configured switch index.
+     * @param lo Lower raw endpoint in microseconds.
+     * @param hi Upper raw endpoint; reversed endpoints are exchanged.
+     * @param count Number of positions, no greater than kRcMaxSwitchVals; zero clears the role.
+     */
     void seed_switch_centroids_(std::size_t index, int lo, int hi, std::uint8_t count) noexcept
     {
         if (count == 0u)
@@ -984,7 +1207,13 @@ template <class Transport, typename E> class RcLink
         sw_active_idx_[index] = -1;
     }
 
-    /// @brief Find the closest configured centroid to a raw switch value.
+    /**
+     * @brief Find the closest configured centroid to a raw switch value.
+     *
+     * @param index Valid switch role with seeded centroids.
+     * @param raw Receiver value in microseconds.
+     * @return Closest centroid ordinal, preferring the first on a tie; zero if none exists.
+     */
     std::uint8_t nearest_centroid_(std::size_t index, int raw) const noexcept
     {
         std::uint8_t nearest = 0u;
@@ -1004,7 +1233,15 @@ template <class Transport, typename E> class RcLink
         return nearest;
     }
 
-    /// @brief Adapt one centroid while preserving configured neighbour separation.
+    /**
+     * @brief Adapt one centroid while preserving configured neighbour separation.
+     *
+     * @param index Valid switch role index.
+     * @param centroid Selected centroid index; out-of-range values are ignored.
+     * @param raw Observed receiver microseconds.
+     * @param alpha Finite EMA factor; nonpositive values disable movement, values above one are clamped.
+     * @param min_sep_us Minimum neighbour spacing in microseconds.
+     */
     void learn_centroid_(std::size_t index, std::uint8_t centroid, int raw, float alpha,
                          std::uint16_t min_sep_us) noexcept
     {
@@ -1032,7 +1269,13 @@ template <class Transport, typename E> class RcLink
         sw_centroid_[index][centroid] = static_cast<std::int16_t>(candidate);
     }
 
-    /// @brief Validate monotonic spacing for one role's learned centroids.
+    /**
+     * @brief Validate monotonic spacing for one role's learned centroids.
+     *
+     * @param index Valid configured switch role index.
+     * @param min_sep_us Required adjacent spacing in microseconds.
+     * @return True for at least two centroids with every adjacent gap meeting the minimum.
+     */
     bool switch_centroids_valid_(std::size_t index, std::uint16_t min_sep_us) const noexcept
     {
         const std::uint8_t count = sw_centroid_count_[index];
@@ -1048,7 +1291,9 @@ template <class Transport, typename E> class RcLink
         return true;
     }
 
-    /// @brief Reset frame-derived state after applying a configuration.
+    /**
+     * @brief Reset frame-derived state after applying a configuration.
+     */
     void reset_runtime_for_config_() noexcept
     {
         switch_learning_enabled_ = false;
@@ -1078,7 +1323,9 @@ template <class Transport, typename E> class RcLink
         fps_last_t_ = 0u;
     }
 
-    /// @brief Clear every working and exposed application frame.
+    /**
+     * @brief Clear every working and exposed application frame.
+     */
     void zero_outputs_() noexcept
     {
         for (std::size_t i = 0u; i < N; ++i)
@@ -1092,7 +1339,9 @@ template <class Transport, typename E> class RcLink
         }
     }
 
-    /// @brief Copy optional parser and transport counters into public diagnostics.
+    /**
+     * @brief Copy optional parser and transport counters into public diagnostics.
+     */
     void pull_transport_diagnostics_() noexcept
     {
         const std::uint32_t frames = detail::transport_frames(tx_, 0);
@@ -1104,7 +1353,11 @@ template <class Transport, typename E> class RcLink
         status_.discarded_bytes = detail::transport_discarded_bytes(tx_, 0);
     }
 
-    /// @brief Update the rolling accepted-frame rate at a bounded cadence.
+    /**
+     * @brief Update the rolling accepted-frame rate at a bounded cadence.
+     *
+     * @param now_ms Current wrapping millisecond timestamp.
+     */
     void update_fps_(std::uint32_t now_ms) noexcept
     {
         const std::uint32_t elapsed = static_cast<std::uint32_t>(now_ms - fps_last_t_);

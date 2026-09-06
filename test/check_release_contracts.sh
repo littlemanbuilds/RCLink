@@ -101,10 +101,14 @@ grep -Fq 'last_good_' "$TARGET/src/Link.hpp" || fail "HoldLast history missing"
 grep -Fq 'set_switch_learning_enabled' "$TARGET/src/Link.hpp" || fail "switch-learning commissioning gate missing"
 
 # RCLink deliberately supports representative non-ESP32 targets. The routine local ESP32 target is S3 only.
-grep -Eq '^src_dir[[:space:]]*=[[:space:]]*test/portable_compile$' "$TARGET/platformio.ini" ||
-    fail "default PlatformIO source must compile the portable smoke sketch"
-grep -Eq '^lib_extra_dirs[[:space:]]*=[[:space:]]*\.$' "$TARGET/platformio.ini" ||
-    fail "default PlatformIO build must register the repository library"
+! grep -Eq '^[[:space:]]*(src_dir|lib_extra_dirs)[[:space:]]*=' "$TARGET/platformio.ini" ||
+    fail "library validation must not redirect project sources or use lib_extra_dirs"
+python3 - "$TARGET/library.json" <<'PYJSON'
+import json
+import sys
+if json.load(open(sys.argv[1])).get("build", {}).get("includeDir") != "src":
+    raise SystemExit("release-contract: build.includeDir must be src")
+PYJSON
 grep -Fq '[env:esp32-s3-devkitc-1]' "$TARGET/platformio.ini" ||
     fail "ESP32-S3 reference environment missing"
 ! grep -Fq '[env:esp32dev]' "$TARGET/platformio.ini" ||
@@ -118,10 +122,12 @@ ci="$TARGET/.github/workflows/ci.yml"
 grep -Fq 'platformio==6.1.19' "$ci" || fail "CI must pin PlatformIO Core 6.1.19"
 grep -Fq 'actions/checkout@v5' "$ci" || fail "CI must use the current checkout action generation"
 grep -Fq 'actions/setup-python@v6' "$ci" || fail "CI must use the current setup-python action generation"
-grep -Fq 'pio run -e "${{ matrix.env }}"' "$ci" ||
-    fail "CI portable matrix must use the repository pio run build contract"
-! grep -Fq 'pio ci --project-conf' "$ci" ||
-    fail "CI must not use the obsolete pio ci build contract"
+grep -Fq 'pio ci --project-conf platformio.ini --lib=. -e "${{ matrix.env }}" test/portable_compile/portable_compile.ino' "$ci" ||
+    fail "CI portable matrix must compile the smoke sketch as a library consumer"
+grep -Fq 'pio ci --project-conf platformio.ini --lib=. -e esp32-s3-devkitc-1 "${{ matrix.example }}"' "$ci" ||
+    fail "CI must compile each public example as a library consumer"
+! grep -Eq 'PLATFORMIO_SRC_DIR|pio run' "$ci" ||
+    fail "CI retains an obsolete project-build command"
 
 if grep -Eq '^[[:space:]]*test/?[[:space:]]*$' "$TARGET/.gitignore"; then
     fail ".gitignore must not ignore committed test/"

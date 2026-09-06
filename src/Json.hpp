@@ -36,7 +36,11 @@ namespace rc
 //
 // The guard below produces a compile error if that order is violated.
 
-/// @brief Prove that role-name helpers were generated before this header was included.
+/**
+ * @brief Prove that role-name helpers were generated before this header was included.
+ *
+ * @tparam E Role enum declared with RC_DECLARE_ROLES before this header.
+ */
 template <typename E> inline void require_role_helpers()
 {
     using ToStringFn = const char *(*)(E);
@@ -46,7 +50,14 @@ template <typename E> inline void require_role_helpers()
     (void)sizeof(rc::role_count(std::declval<E>()));
 }
 
-/// @brief Look up enum value by role name via RC_DECLARE_ROLES helpers.
+/**
+ * @brief Look up enum value by role name via RC_DECLARE_ROLES helpers.
+ *
+ * @tparam E Role enum with generated naming helpers.
+ * @param name Case-sensitive role name; nullptr never matches.
+ * @param out Receives the matching enum; unchanged on failure.
+ * @return True when a declared role name matches exactly.
+ */
 template <typename E> inline bool role_from_name(const char *name, E &out)
 {
     require_role_helpers<E>();
@@ -69,34 +80,41 @@ template <typename E> inline bool role_from_name(const char *name, E &out)
 }
 
 /**
-     * @brief Load RcConfig from a JSON string.
-     * @code
-     * // Schema:
-     * {
-     *   "map": { "RoleName": 0, ... },
-     *   "axes": {
-     *     "RoleName": {
-     *       "raw": [lo, hi, center],
-     *       "deadband_us": 0,
-     *       "out": [lo, hi],
-     *       "center_out": 0,
-     *       "expo": 0.0,
-     *       "invert": true
-     *     }
-     *   },
-     *   "switches": {
-     *     "RoleName": {
-     *       "values": [0,1,2],
-     *       "raw_levels": [1000,1500,2000],
-     *       "auto_levels": true,
-     *       "hyst_us": 60,
-     *       "learn_alpha": 0.2,
-     *       "min_sep_us": 120
-     *     }
-     *   }
-     * }
-     * @endcode
-     */
+ * @brief Load RcConfig from a JSON string.
+ *
+ * @code
+ * // Schema:
+ * {
+ *   "map": { "RoleName": 0, ... },
+ *   "axes": {
+ *     "RoleName": {
+ *       "raw": [lo, hi, center],
+ *       "deadband_us": 0,
+ *       "out": [lo, hi],
+ *       "center_out": 0,
+ *       "expo": 0.0,
+ *       "invert": true
+ *     }
+ *   },
+ *   "switches": {
+ *     "RoleName": {
+ *       "values": [0,1,2],
+ *       "raw_levels": [1000,1500,2000],
+ *       "auto_levels": true,
+ *       "hyst_us": 60,
+ *       "learn_alpha": 0.2,
+ *       "min_sep_us": 120
+ *     }
+ *   }
+ * }
+ * @endcode
+ *
+ * @tparam E Role enum declared before this header.
+ * @param cfg Configuration to modify in place; earlier changes remain on failure.
+ * @param json Null-terminated JSON text; nullptr is rejected.
+ * @return False on parse or checked range errors; true does not imply configuration validity.
+ * @note Unknown roles and absent fields are ignored. Validate with apply_config() before use.
+ */
 template <typename E> bool load_json(E /*tag*/, RcConfig<E> &cfg, const char *json)
 {
     require_role_helpers<E>();

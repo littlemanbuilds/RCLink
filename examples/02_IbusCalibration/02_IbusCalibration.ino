@@ -10,16 +10,19 @@
  *
  */
 
-#include <calibration/Ibus_Calibrate.hpp>
+#define RCLINK_NO_LEGACY_GLOBAL_ALIASES // Use the namespace API in this self-contained sketch.
 #include <RCLink.h>
 
+#include <calibration/Ibus_Calibrate.hpp>
 #include <Arduino.h>
+
+using namespace rc;
 
 // ---- Wiring configuration ---- //
 
 const int RX_PIN = 18;             // iBUS signal from the receiver.
 const int TX_PIN = -1;             // TX is not used for iBUS.
-const uint32_t IBUS_BAUD = 115200; // Typical iBUS baud rate.
+const uint32_t IBUS_BAUD = 115200; // Exact-width UART baud argument; 115200 exceeds a 16-bit int.
 
 void setup()
 {

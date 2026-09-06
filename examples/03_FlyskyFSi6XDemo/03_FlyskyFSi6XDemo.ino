@@ -10,15 +10,18 @@
  *
  */
 
+#define RCLINK_NO_LEGACY_GLOBAL_ALIASES // Use the namespace API in this self-contained sketch.
 #include <RCLink.h>
 
 #include <Arduino.h>
+
+using namespace rc;
 
 // ---- Wiring configuration ---- //
 
 const int RX_PIN = 18;             // iBUS signal from the receiver.
 const int TX_PIN = -1;             // TX is not used for iBUS.
-const uint32_t IBUS_BAUD = 115200; // Typical iBUS baud rate.
+const uint32_t IBUS_BAUD = 115200; // Exact-width UART baud argument; 115200 exceeds a 16-bit int.
 
 #define FLYSKY_ROLES(_)                                                                                                \
     _(Ch1_RH)   /* CH1: Right stick horizontal (roll) */                                                               \
@@ -65,7 +68,7 @@ void setup()
     cfg.sw(Flysky::Ch9_SwC).values({0.0f, 1.0f, 2.0f}).done();
     cfg.sw(Flysky::Ch10_SwD).values({0.0f, 1.0f}).done();
 
-    const rc::RcConfigResult result = rclink.apply_config(cfg);
+    const RcConfigResult result = rclink.apply_config(cfg);
     if (!result)
     {
         Serial.println(F("RCLink configuration rejected. Check channel mapping and switch/axis settings."));

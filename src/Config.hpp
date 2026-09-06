@@ -27,20 +27,35 @@ namespace detail
 static constexpr int kInt16MinValue = -32768; ///< Lowest output representable by RCLink.
 static constexpr int kInt16MaxValue = 32767;  ///< Highest output representable by RCLink.
 
-/// @brief Return whether a configuration value is finite.
+/**
+ * @brief Return whether a configuration value is finite.
+ *
+ * @param value Configuration number to check.
+ * @return False for NaN or either infinity.
+ */
 inline bool finite_float(float value) noexcept
 {
     return std::isfinite(value) != 0;
 }
 
-/// @brief Return whether a finite value fits RCLink's exposed int16 output.
+/**
+ * @brief Return whether a finite value fits RCLink's exposed int16 output.
+ *
+ * @param value Application output to validate.
+ * @return True for finite values in [-32768,32767].
+ */
 inline bool fits_int16(float value) noexcept
 {
     return finite_float(value) && value >= static_cast<float>(kInt16MinValue) &&
            value <= static_cast<float>(kInt16MaxValue);
 }
 
-/// @brief Resolve an axis centre output while preserving endpoint-centred compatibility.
+/**
+ * @brief Resolve an axis centre output while preserving endpoint-centred compatibility.
+ *
+ * @param axis Axis settings whose centre is resolved.
+ * @return Explicit centre, endpoint output for an endpoint centre, or output midpoint.
+ */
 inline float inferred_axis_center_output(const RcAxisSpec &axis) noexcept
 {
     if (axis.has_out_center)
@@ -54,14 +69,14 @@ inline float inferred_axis_center_output(const RcAxisSpec &axis) noexcept
 } // namespace detail
 
 /**
-     * @brief Configuration for an RCLink role enum ending in `Count`.
-     *
-     * All roles are required by default. Call @ref optional() for a role that may
-     * legitimately be absent from a receiver frame. Unmapped required roles fail
-     * validation instead of silently reading receiver channel zero.
-     *
-     * @tparam E Logical role enum.
-     */
+ * @brief Configuration for an RCLink role enum ending in `Count`.
+ *
+ * All roles are required by default. Call @ref optional() for a role that may
+ * legitimately be absent from a receiver frame. Unmapped required roles fail
+ * validation instead of silently reading receiver channel zero.
+ *
+ * @tparam E Logical role enum.
+ */
 template <typename E> struct RcConfig
 {
     static constexpr std::size_t N = static_cast<std::size_t>(E::Count); ///< Logical role count.
@@ -80,8 +95,8 @@ template <typename E> struct RcConfig
     std::uint8_t build_error_channel{kInvalidChannel}; ///< Channel associated with @ref build_error.
 
     /**
-         * @brief Create a fail-closed configuration with every role initially unmapped and required.
-         */
+     * @brief Create a fail-closed configuration with every role initially unmapped and required.
+     */
     RcConfig()
     {
         for (std::size_t i = 0; i < N; ++i)
@@ -93,12 +108,12 @@ template <typename E> struct RcConfig
     }
 
     /**
-         * @brief Map a logical role to a receiver channel.
-         *
-         * @param role Logical role to assign.
-         * @param rx Zero-based receiver channel index.
-         * @return This configuration for fluent chaining.
-         */
+     * @brief Map a logical role to a receiver channel.
+     *
+     * @param role Logical role to assign.
+     * @param rx Zero-based receiver channel index.
+     * @return This configuration for fluent chaining.
+     */
     RcConfig &map(E role, std::uint8_t rx)
     {
         const std::size_t i = static_cast<std::size_t>(role);
@@ -119,12 +134,12 @@ template <typename E> struct RcConfig
     }
 
     /**
-         * @brief Mark whether a role is required for a healthy frame.
-         *
-         * @param role Logical role to update.
-         * @param required True when missing/invalid data must fail provider health.
-         * @return This configuration for fluent chaining.
-         */
+     * @brief Mark whether a role is required for a healthy frame.
+     *
+     * @param role Logical role to update.
+     * @param required True when missing/invalid data must fail provider health.
+     * @return This configuration for fluent chaining.
+     */
     RcConfig &require(E role, bool required = true)
     {
         const std::size_t i = static_cast<std::size_t>(role);
@@ -138,39 +153,45 @@ template <typename E> struct RcConfig
     }
 
     /**
-         * @brief Mark a role as optional.
-         *
-         * @param role Logical role that may be absent without invalidating required-role health.
-         * @return This configuration for fluent chaining.
-         */
+     * @brief Mark a role as optional.
+     *
+     * @param role Logical role that may be absent without invalidating required-role health.
+     * @return This configuration for fluent chaining.
+     */
     RcConfig &optional(E role)
     {
         return require(role, false);
     }
 
     /**
-         * @brief Fluent axis builder.
-         */
+     * @brief Fluent axis builder.
+     */
     struct AxisB
     {
         RcChannelSpec *s; ///< Selected role specification, or nullptr for an invalid role.
         RcConfig *cfg;    ///< Parent configuration.
         std::size_t idx;  ///< Selected logical role index.
 
-        /// @brief Construct a bounds-aware axis builder for one role.
+        /**
+         * @brief Construct a bounds-aware axis builder for one role.
+         *
+         * @param spec Selected specification, or nullptr to make mutations inert.
+         * @param parent Non-null parent configuration; must outlive the builder.
+         * @param role_index Logical role index used for error context.
+         */
         AxisB(RcChannelSpec *spec, RcConfig *parent, std::size_t role_index) noexcept
             : s(spec), cfg(parent), idx(role_index)
         {
         }
 
         /**
-             * @brief Configure calibrated raw endpoints and physical neutral.
-             *
-             * @param lo Lower receiver value in microseconds.
-             * @param hi Upper receiver value in microseconds.
-             * @param center Neutral receiver value in microseconds.
-             * @return This builder.
-             */
+         * @brief Configure calibrated raw endpoints and physical neutral.
+         *
+         * @param lo Lower receiver value in microseconds.
+         * @param hi Upper receiver value in microseconds.
+         * @param center Neutral receiver value in microseconds.
+         * @return This builder.
+         */
         AxisB &raw(std::int16_t lo, std::int16_t hi, std::int16_t center)
         {
             if (!s)
@@ -183,11 +204,11 @@ template <typename E> struct RcConfig
         }
 
         /**
-             * @brief Configure a deadband around the calibrated centre.
-             *
-             * @param d Deadband half-width in microseconds; negative values become zero.
-             * @return This builder.
-             */
+         * @brief Configure a deadband around the calibrated centre.
+         *
+         * @param d Deadband half-width in microseconds; negative values become zero.
+         * @return This builder.
+         */
         AxisB &deadband_us(std::int16_t d)
         {
             if (s)
@@ -196,16 +217,16 @@ template <typename E> struct RcConfig
         }
 
         /**
-             * @brief Configure the low and high application-space outputs.
-             *
-             * Centred axes require ascending outputs and use @ref invert() to
-             * reverse direction. Endpoint-centred one-sided axes may reverse
-             * these endpoints directly instead.
-             *
-             * @param lo Output at raw_lo.
-             * @param hi Output at raw_hi.
-             * @return This builder.
-             */
+         * @brief Configure the low and high application-space outputs.
+         *
+         * Centred axes require ascending outputs and use @ref invert() to
+         * reverse direction. Endpoint-centred one-sided axes may reverse
+         * these endpoints directly instead.
+         *
+         * @param lo Output at raw_lo.
+         * @param hi Output at raw_hi.
+         * @return This builder.
+         */
         AxisB &out(float lo, float hi)
         {
             if (!s)
@@ -221,14 +242,14 @@ template <typename E> struct RcConfig
         }
 
         /**
-             * @brief Explicitly configure the output corresponding to raw_center.
-             *
-             * When omitted, RCLink uses the output midpoint for an internal centre,
-             * out_lo for raw_center == raw_lo, and out_hi for raw_center == raw_hi.
-             *
-             * @param value Application-space neutral value.
-             * @return This builder.
-             */
+         * @brief Explicitly configure the output corresponding to raw_center.
+         *
+         * When omitted, RCLink uses the output midpoint for an internal centre,
+         * out_lo for raw_center == raw_lo, and out_hi for raw_center == raw_hi.
+         *
+         * @param value Application-space neutral value.
+         * @return This builder.
+         */
         AxisB &center_out(float value)
         {
             if (!s)
@@ -244,11 +265,11 @@ template <typename E> struct RcConfig
         }
 
         /**
-             * @brief Configure the cubic-mix expo factor.
-             *
-             * @param e Expo factor in [0,1].
-             * @return This builder.
-             */
+         * @brief Configure the cubic-mix expo factor.
+         *
+         * @param e Expo factor in [0,1].
+         * @return This builder.
+         */
         AxisB &expo(float e)
         {
             if (!s)
@@ -267,11 +288,11 @@ template <typename E> struct RcConfig
         }
 
         /**
-             * @brief Reverse the normalized axis direction.
-             *
-             * @param inv True to invert the axis.
-             * @return This builder.
-             */
+         * @brief Reverse the normalized axis direction.
+         *
+         * @param inv True to invert the axis.
+         * @return This builder.
+         */
         AxisB &invert(bool inv = true)
         {
             if (s)
@@ -280,12 +301,12 @@ template <typename E> struct RcConfig
         }
 
         /**
-             * @brief Configure the role failsafe policy.
-             *
-             * @param m Failsafe mode.
-             * @param v Value used by Failsafe::Mode::Value.
-             * @return This builder.
-             */
+         * @brief Configure the role failsafe policy.
+         *
+         * @param m Failsafe mode.
+         * @param v Value used by Failsafe::Mode::Value.
+         * @return This builder.
+         */
         AxisB &failsafe(Failsafe::Mode m, std::int16_t v = 0)
         {
             if (cfg && s)
@@ -297,10 +318,10 @@ template <typename E> struct RcConfig
         }
 
         /**
-             * @brief Finish the role builder.
-             *
-             * @return Parent configuration.
-             */
+         * @brief Finish the role builder.
+         *
+         * @return Parent configuration.
+         */
         RcConfig &done()
         {
             return *cfg;
@@ -308,11 +329,11 @@ template <typename E> struct RcConfig
     };
 
     /**
-         * @brief Configure a logical role as an axis.
-         *
-         * @param role Logical role.
-         * @return Bounds-checked axis builder.
-         */
+     * @brief Configure a logical role as an axis.
+     *
+     * @param role Logical role.
+     * @return Bounds-checked axis builder.
+     */
     AxisB axis(E role)
     {
         const std::size_t i = static_cast<std::size_t>(role);
@@ -326,26 +347,32 @@ template <typename E> struct RcConfig
     }
 
     /**
-         * @brief Fluent switch builder.
-         */
+     * @brief Fluent switch builder.
+     */
     struct SwitchB
     {
         RcChannelSpec *s; ///< Selected role specification, or nullptr for an invalid role.
         RcConfig *cfg;    ///< Parent configuration.
         std::size_t idx;  ///< Selected logical role index.
 
-        /// @brief Construct a bounds-aware switch builder for one role.
+        /**
+         * @brief Construct a bounds-aware switch builder for one role.
+         *
+         * @param spec Selected specification, or nullptr to make mutations inert.
+         * @param parent Non-null parent configuration; must outlive the builder.
+         * @param role_index Logical role index used for error context.
+         */
         SwitchB(RcChannelSpec *spec, RcConfig *parent, std::size_t role_index) noexcept
             : s(spec), cfg(parent), idx(role_index)
         {
         }
 
         /**
-             * @brief Configure logical outputs for each switch position.
-             *
-             * @param v Ordered output values.
-             * @return This builder.
-             */
+         * @brief Configure logical outputs for each switch position.
+         *
+         * @param v Ordered output values.
+         * @return This builder.
+         */
         SwitchB &values(std::initializer_list<float> v)
         {
             if (!s)
@@ -370,11 +397,11 @@ template <typename E> struct RcConfig
         }
 
         /**
-             * @brief Configure deterministic raw snap levels and disable learning.
-             *
-             * @param lvls Raw receiver values in the same order as @ref values().
-             * @return This builder.
-             */
+         * @brief Configure deterministic raw snap levels and disable learning.
+         *
+         * @param lvls Raw receiver values in the same order as @ref values().
+         * @return This builder.
+         */
         SwitchB &raw_levels(std::initializer_list<std::int16_t> lvls)
         {
             if (!s)
@@ -396,14 +423,14 @@ template <typename E> struct RcConfig
         }
 
         /**
-             * @brief Mark a switch as eligible for explicit commissioning-time learning.
-             *
-             * Learning does not run merely because this flag is true. The RcLink
-             * instance must also be placed into switch-learning mode.
-             *
-             * @param enable True to permit learning.
-             * @return This builder.
-             */
+         * @brief Mark a switch as eligible for explicit commissioning-time learning.
+         *
+         * Learning does not run merely because this flag is true. The RcLink
+         * instance must also be placed into switch-learning mode.
+         *
+         * @param enable True to permit learning.
+         * @return This builder.
+         */
         SwitchB &auto_levels(bool enable = true)
         {
             if (s)
@@ -415,11 +442,11 @@ template <typename E> struct RcConfig
         }
 
         /**
-             * @brief Configure switch snap hysteresis.
-             *
-             * @param us Total hysteresis band in microseconds.
-             * @return This builder.
-             */
+         * @brief Configure switch snap hysteresis.
+         *
+         * @param us Total hysteresis band in microseconds.
+         * @return This builder.
+         */
         SwitchB &hysteresis_us(std::uint16_t us)
         {
             if (s)
@@ -431,11 +458,11 @@ template <typename E> struct RcConfig
         }
 
         /**
-             * @brief Configure commissioning-time centroid learning rate.
-             *
-             * @param a EMA alpha in (0,1].
-             * @return This builder.
-             */
+         * @brief Configure commissioning-time centroid learning rate.
+         *
+         * @param a EMA alpha in (0,1].
+         * @return This builder.
+         */
         SwitchB &learn_alpha(float a)
         {
             if (!s)
@@ -455,11 +482,11 @@ template <typename E> struct RcConfig
         }
 
         /**
-             * @brief Configure minimum spacing between learned switch centroids.
-             *
-             * @param us Minimum separation in microseconds.
-             * @return This builder.
-             */
+         * @brief Configure minimum spacing between learned switch centroids.
+         *
+         * @param us Minimum separation in microseconds.
+         * @return This builder.
+         */
         SwitchB &min_sep_us(std::uint16_t us)
         {
             if (s)
@@ -471,12 +498,12 @@ template <typename E> struct RcConfig
         }
 
         /**
-             * @brief Configure the role failsafe policy.
-             *
-             * @param m Failsafe mode.
-             * @param v Value used by Failsafe::Mode::Value.
-             * @return This builder.
-             */
+         * @brief Configure the role failsafe policy.
+         *
+         * @param m Failsafe mode.
+         * @param v Value used by Failsafe::Mode::Value.
+         * @return This builder.
+         */
         SwitchB &failsafe(Failsafe::Mode m, std::int16_t v = 0)
         {
             if (cfg && s)
@@ -488,10 +515,10 @@ template <typename E> struct RcConfig
         }
 
         /**
-             * @brief Finish the role builder.
-             *
-             * @return Parent configuration.
-             */
+         * @brief Finish the role builder.
+         *
+         * @return Parent configuration.
+         */
         RcConfig &done()
         {
             return *cfg;
@@ -499,11 +526,11 @@ template <typename E> struct RcConfig
     };
 
     /**
-         * @brief Configure a logical role as a switch.
-         *
-         * @param role Logical role.
-         * @return Bounds-checked switch builder.
-         */
+     * @brief Configure a logical role as a switch.
+     *
+     * @param role Logical role.
+     * @return Bounds-checked switch builder.
+     */
     SwitchB sw(E role)
     {
         const std::size_t i = static_cast<std::size_t>(role);
@@ -517,11 +544,11 @@ template <typename E> struct RcConfig
     }
 
     /**
-         * @brief Set the receiver freshness timeout.
-         *
-         * @param ms Maximum frame age in milliseconds; zero is invalid.
-         * @return This configuration for fluent chaining.
-         */
+     * @brief Set the receiver freshness timeout.
+     *
+     * @param ms Maximum frame age in milliseconds; zero is invalid.
+     * @return This configuration for fluent chaining.
+     */
     RcConfig &setLinkTimeout(std::uint16_t ms)
     {
         if (ms == 0u)
@@ -532,12 +559,12 @@ template <typename E> struct RcConfig
     }
 
     /**
-         * @brief Set output epsilon for a logical role.
-         *
-         * @param role Logical role.
-         * @param e Suppression threshold; negative values become zero.
-         * @return This configuration for fluent chaining.
-         */
+     * @brief Set output epsilon for a logical role.
+     *
+     * @param role Logical role.
+     * @param e Suppression threshold; negative values become zero.
+     * @return This configuration for fluent chaining.
+     */
     RcConfig &setEpsilon(E role, std::int16_t e)
     {
         const std::size_t i = static_cast<std::size_t>(role);
@@ -551,12 +578,12 @@ template <typename E> struct RcConfig
     }
 
     /**
-         * @brief Set per-axis EMA filtering.
-         *
-         * @param role Logical role.
-         * @param alpha Smoothing factor in [0,1].
-         * @return This configuration for fluent chaining.
-         */
+     * @brief Set per-axis EMA filtering.
+     *
+     * @param role Logical role.
+     * @param alpha Smoothing factor in [0,1].
+     * @return This configuration for fluent chaining.
+     */
     RcConfig &setAxisFilter(E role, float alpha)
     {
         const std::size_t i = static_cast<std::size_t>(role);
@@ -579,13 +606,13 @@ template <typename E> struct RcConfig
     }
 
     /**
-         * @brief Set a per-role failsafe policy.
-         *
-         * @param role Logical role.
-         * @param mode Failsafe mode.
-         * @param v Value used by Failsafe::Mode::Value.
-         * @return This configuration for fluent chaining.
-         */
+     * @brief Set a per-role failsafe policy.
+     *
+     * @param role Logical role.
+     * @param mode Failsafe mode.
+     * @param v Value used by Failsafe::Mode::Value.
+     * @return This configuration for fluent chaining.
+     */
     RcConfig &setFailsafePolicy(E role, Failsafe::Mode mode, std::int16_t v = 0)
     {
         const std::size_t i = static_cast<std::size_t>(role);
@@ -600,7 +627,13 @@ template <typename E> struct RcConfig
     }
 
   private:
-    /// @brief Preserve the first fluent-builder error for later activation validation.
+    /**
+     * @brief Preserve the first fluent-builder error for later activation validation.
+     *
+     * @param error Failure to record if no earlier builder error exists.
+     * @param role Logical role index associated with the failure.
+     * @param channel Receiver channel, or kInvalidChannel when not applicable.
+     */
     void note_error_(RcConfigError error, std::size_t role, std::uint8_t channel)
     {
         if (build_error == RcConfigError::None)
@@ -613,23 +646,23 @@ template <typename E> struct RcConfig
 };
 
 /**
-     * @brief Resolve the application-space output at an axis physical centre.
-     *
-     * @param axis Axis specification.
-     * @return Explicit or compatibility-inferred centre output.
-     */
+ * @brief Resolve the application-space output at an axis physical centre.
+ *
+ * @param axis Axis specification.
+ * @return Explicit or compatibility-inferred centre output.
+ */
 inline float axis_center_output(const RcAxisSpec &axis) noexcept
 {
     return detail::inferred_axis_center_output(axis);
 }
 
 /**
-     * @brief Validate a complete logical-role configuration before it becomes active.
-     *
-     * @tparam E Logical role enum.
-     * @param cfg Configuration to validate.
-     * @return Detailed activation result.
-     */
+ * @brief Validate a complete logical-role configuration before it becomes active.
+ *
+ * @tparam E Logical role enum.
+ * @param cfg Configuration to validate.
+ * @return Detailed activation result.
+ */
 template <typename E> RcConfigResult validate_config(const RcConfig<E> &cfg)
 {
     typedef RcConfig<E> Config;

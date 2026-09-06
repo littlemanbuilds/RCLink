@@ -1,7 +1,7 @@
 /**
  * MIT License
  *
- * @brief Demonstrate filtering, epsilon suppression, failsafe signatures, and status reporting.
+ * @brief Commission and observe a shaped RC input with receiver-failsafe diagnostics.
  *
  * @file 05_AdvancedFeatureDemo.ino
  * @author Little Man Builds (Darren Osborne)
@@ -10,15 +10,18 @@
  *
  */
 
+#define RCLINK_NO_LEGACY_GLOBAL_ALIASES // Use the namespace API in this self-contained sketch.
 #include <RCLink.h>
 
 #include <Arduino.h>
+
+using namespace rc;
 
 // ---- Wiring (iBUS, same as earlier demos) ---- //
 
 const int RX_PIN = 18;             // iBUS signal from the receiver.
 const int TX_PIN = -1;             // TX is not used for iBUS.
-const uint32_t IBUS_BAUD = 115200; // Typical iBUS baud rate.
+const uint32_t IBUS_BAUD = 115200; // Exact-width UART baud argument; 115200 exceeds a 16-bit int.
 
 // ---- Roles (10 channels) ---- //
 
@@ -99,23 +102,23 @@ void setup()
 
     // Per-channel failsafe policies apply when required receiver evidence is unsafe,
     // including stale links, invalid required roles, and protocol failsafe indications.
-    cfg.setFailsafePolicy(Flysky::Ch1_RH, rc::Failsafe::Mode::Value, 0);
-    cfg.setFailsafePolicy(Flysky::Ch2_RV, rc::Failsafe::Mode::Value, 0);
-    cfg.setFailsafePolicy(Flysky::Ch3_LV, rc::Failsafe::Mode::Value, 0);
-    cfg.setFailsafePolicy(Flysky::Ch4_LH, rc::Failsafe::Mode::Value, 0);
-    cfg.setFailsafePolicy(Flysky::Ch5_VrA, rc::Failsafe::Mode::Value, 0);
-    cfg.setFailsafePolicy(Flysky::Ch6_VrB, rc::Failsafe::Mode::Value, 0);
-    cfg.setFailsafePolicy(Flysky::Ch7_SwA, rc::Failsafe::Mode::Value, 0);
-    cfg.setFailsafePolicy(Flysky::Ch8_SwB, rc::Failsafe::Mode::Value, 0);
-    cfg.setFailsafePolicy(Flysky::Ch9_SwC, rc::Failsafe::Mode::Value, 0);
-    cfg.setFailsafePolicy(Flysky::Ch10_SwD, rc::Failsafe::Mode::Value, 0);
+    cfg.setFailsafePolicy(Flysky::Ch1_RH, Failsafe::Mode::Value, 0);
+    cfg.setFailsafePolicy(Flysky::Ch2_RV, Failsafe::Mode::Value, 0);
+    cfg.setFailsafePolicy(Flysky::Ch3_LV, Failsafe::Mode::Value, 0);
+    cfg.setFailsafePolicy(Flysky::Ch4_LH, Failsafe::Mode::Value, 0);
+    cfg.setFailsafePolicy(Flysky::Ch5_VrA, Failsafe::Mode::Value, 0);
+    cfg.setFailsafePolicy(Flysky::Ch6_VrB, Failsafe::Mode::Value, 0);
+    cfg.setFailsafePolicy(Flysky::Ch7_SwA, Failsafe::Mode::Value, 0);
+    cfg.setFailsafePolicy(Flysky::Ch8_SwB, Failsafe::Mode::Value, 0);
+    cfg.setFailsafePolicy(Flysky::Ch9_SwC, Failsafe::Mode::Value, 0);
+    cfg.setFailsafePolicy(Flysky::Ch10_SwD, Failsafe::Mode::Value, 0);
 
     // Sets the receiver-failsafe signature (when the receiver keeps sending frames but in a
     // known pattern). This DOESN'T apply the output policy automatically.
-    const rc::FsRule<Flysky> rx_failsafe_signature = rc::make_signature_selected(
+    const FsRule<Flysky> rx_failsafe_signature = make_signature_selected(
         Flysky{}, /* tol */ 2, /* hold_ms */ 250,
         {{Flysky::Ch1_RH, 100}, {Flysky::Ch2_RV, 100}, {Flysky::Ch3_LV, 100}, {Flysky::Ch4_LH, -100}});
-    const rc::RcSignatureResult signature_result = rclink.set_failsafe_signature(rx_failsafe_signature);
+    const RcSignatureResult signature_result = rclink.set_failsafe_signature(rx_failsafe_signature);
     if (!signature_result)
         Serial.println(F("Receiver failsafe signature was rejected."));
 
@@ -124,7 +127,7 @@ void setup()
     // status().rx_failsafe_sig still reports the match, but outputs continue to follow live frames.
     rclink.apply_rxfs_outputs(false);
 
-    const rc::RcConfigResult config_result = rclink.apply_config(cfg);
+    const RcConfigResult config_result = rclink.apply_config(cfg);
     if (!config_result)
     {
         Serial.println(F("RCLink configuration rejected. Check channel mapping and switch/axis settings."));
@@ -149,7 +152,7 @@ void loop()
     rclink.update();
 
     // Periodic status heartbeat (every second).
-    static uint32_t lastHB = 0;
+    static uint32_t lastHB = 0; // Millisecond timestamp; unsigned subtraction handles rollover.
     const uint32_t now = millis();
     const RcLinkStatus &st = rclink.status();
 
@@ -201,7 +204,7 @@ void loop()
     }
 
     // Example: use individual roles directly (here throttle as 0..100).
-    const int16_t throttle = rclink.read(Flysky::Ch3_LV);
+    const int throttle = rclink.read(Flysky::Ch3_LV);
     (void)throttle; // Replace with your application logic.
 
     delay(10); // About 100 Hz loop rate.

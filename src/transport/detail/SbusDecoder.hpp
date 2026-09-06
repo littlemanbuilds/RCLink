@@ -22,14 +22,14 @@ namespace rc
 namespace detail
 {
 /**
-         * @brief Decode standard 25-byte SBUS frames without Arduino dependencies.
-         */
+ * @brief Decode standard 25-byte SBUS frames without Arduino dependencies.
+ */
 class SbusDecoder
 {
   public:
     /**
-             * @brief Reset parser state and diagnostics.
-             */
+     * @brief Reset parser state and diagnostics.
+     */
     void reset() noexcept
     {
         count_ = 0u;
@@ -48,12 +48,12 @@ class SbusDecoder
     }
 
     /**
-             * @brief Feed one SBUS byte.
-             *
-             * @param byte Next UART byte.
-             * @param now_ms Timestamp associated with this parser service point.
-             * @return True when a complete valid frame is decoded.
-             */
+     * @brief Feed one SBUS byte.
+     *
+     * @param byte Next UART byte.
+     * @param now_ms Timestamp associated with this parser service point.
+     * @return True when a complete valid frame is decoded.
+     */
     bool feed(std::uint8_t byte, std::uint32_t now_ms) noexcept
     {
         tick(now_ms);
@@ -93,10 +93,10 @@ class SbusDecoder
     }
 
     /**
-             * @brief Reset a stalled partial frame after the inter-byte timeout.
-             *
-             * @param now_ms Current timestamp.
-             */
+     * @brief Reset a stalled partial frame after the inter-byte timeout.
+     *
+     * @param now_ms Current timestamp.
+     */
     void tick(std::uint32_t now_ms) noexcept
     {
         if (count_ != 0u && has_last_byte_ &&
@@ -109,72 +109,112 @@ class SbusDecoder
         }
     }
 
-    /// @brief Return the standard SBUS analogue channel count.
+    /**
+     * @brief Return the standard SBUS analogue channel count.
+     *
+     * @return 16 analogue channels, including before the first frame.
+     */
     int channels() const noexcept
     {
         return kSbusChannels;
     }
 
     /**
-             * @brief Read one decoded channel in approximate microseconds.
-             *
-             * @param channel Zero-based channel index [0,15].
-             * @return Converted channel value, or zero when out of range.
-             */
+     * @brief Read one decoded channel in approximate microseconds.
+     *
+     * @param channel Zero-based channel index [0,15].
+     * @return Converted channel value, or zero when out of range.
+     */
     int readRaw(int channel) const noexcept
     {
         return (channel >= 0 && channel < kSbusChannels) ? channels_us_[static_cast<std::size_t>(channel)] : 0;
     }
 
-    /// @brief Return the failsafe flag from the last accepted frame.
+    /**
+     * @brief Return the failsafe flag from the last accepted frame.
+     *
+     * @return Last accepted receiver failsafe bit; false after reset.
+     */
     bool protoFailsafe() const noexcept
     {
         return failsafe_;
     }
 
-    /// @brief Return the frame-lost flag from the last accepted frame.
+    /**
+     * @brief Return the frame-lost flag from the last accepted frame.
+     *
+     * @return Last accepted frame-lost bit; false after reset.
+     */
     bool frameLost() const noexcept
     {
         return frame_lost_;
     }
 
-    /// @brief Return validity bits for all standard analogue channels.
+    /**
+     * @brief Return validity bits for all standard analogue channels.
+     *
+     * @return 0xFFFF for supported analogue channels; this mask does not prove reception or freshness.
+     */
     std::uint32_t channelValidMask() const noexcept
     {
         return 0xFFFFu;
     }
 
-    /// @brief Return the accepted frame count.
+    /**
+     * @brief Return the accepted frame count.
+     *
+     * @return Accepted-frame counter since reset; wraps modulo 2^32.
+     */
     std::uint32_t frames() const noexcept
     {
         return frames_;
     }
 
-    /// @brief Return invalid footers through the transport checksum diagnostic.
+    /**
+     * @brief Return invalid footers through the transport checksum diagnostic.
+     *
+     * @return Invalid-footer counter since reset; SBUS has no checksum.
+     */
     std::uint32_t crcErrors() const noexcept
     {
         return footer_errors_;
     }
 
-    /// @brief Return the parser state recovery count.
+    /**
+     * @brief Return the parser state recovery count.
+     *
+     * @return Parser recovery counter since reset; wraps modulo 2^32.
+     */
     std::uint32_t parseErrors() const noexcept
     {
         return parse_errors_;
     }
 
-    /// @brief Return the partial-frame timeout count.
+    /**
+     * @brief Return the partial-frame timeout count.
+     *
+     * @return Partial-frame timeout counter since reset; wraps modulo 2^32.
+     */
     std::uint32_t parserTimeouts() const noexcept
     {
         return timeout_resets_;
     }
 
-    /// @brief Return bytes discarded during parser recovery.
+    /**
+     * @brief Return bytes discarded during parser recovery.
+     *
+     * @return Recovery-discarded byte counter since reset; wraps modulo 2^32.
+     */
     std::uint32_t discardedBytes() const noexcept
     {
         return discarded_bytes_;
     }
 
-    /// @brief Return the timestamp of the last accepted frame.
+    /**
+     * @brief Return the timestamp of the last accepted frame.
+     *
+     * @return Last accepted frame timestamp in milliseconds; zero also represents reset.
+     */
     std::uint32_t lastGoodMs() const noexcept
     {
         return last_good_ms_;
@@ -184,15 +224,24 @@ class SbusDecoder
     static constexpr std::size_t kFrameBytes = 25u;   ///< Standard SBUS frame size.
     static constexpr std::uint8_t kStartByte = 0x0Fu; ///< Standard SBUS frame marker.
 
-    /// @brief Accept standard SBUS footer values used by receiver variants.
+    /**
+     * @brief Accept standard SBUS footer values used by receiver variants.
+     *
+     * @param footer Last byte of a complete candidate SBUS frame.
+     * @return True for 0x00, 0x04, 0x14, 0x24, or 0x34.
+     */
     static bool valid_footer_(std::uint8_t footer) noexcept
     {
         return footer == 0x00u || footer == 0x04u || footer == 0x14u || footer == 0x24u || footer == 0x34u;
     }
 
-    /// @brief Recover the next buffered start marker after a malformed frame.
+    /**
+     * @brief Recover the next buffered start marker after a malformed frame.
+     */
     void resync_after_error_() noexcept
     {
+        // Retain a possible frame suffix; discarding the whole candidate could lose
+        // the start of the next frame after a dropped or inserted byte.
         std::size_t next_start = kFrameBytes;
         for (std::size_t i = 1u; i < count_; ++i)
         {
@@ -218,7 +267,9 @@ class SbusDecoder
         count_ = remaining;
     }
 
-    /// @brief Unpack and convert one structurally valid SBUS frame.
+    /**
+     * @brief Unpack and convert one structurally valid SBUS frame.
+     */
     void parse_frame_() noexcept
     {
         const std::uint8_t *d = buffer_ + 1u;

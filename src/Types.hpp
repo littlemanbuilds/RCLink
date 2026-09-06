@@ -20,8 +20,8 @@
 namespace rc
 {
 /**
-     * @brief Capabilities exposed by a receiver transport.
-     */
+ * @brief Capabilities exposed by a receiver transport.
+ */
 struct RcTransportCaps
 {
     bool has_proto_failsafe{false}; ///< Protocol exposes a receiver/protocol failsafe flag.
@@ -31,8 +31,8 @@ struct RcTransportCaps
 };
 
 /**
-     * @brief Logical channel type.
-     */
+ * @brief Logical channel type.
+ */
 enum class ChannelKind : std::uint8_t
 {
     Axis,  ///< Continuous control such as a stick or knob.
@@ -40,8 +40,8 @@ enum class ChannelKind : std::uint8_t
 };
 
 /**
-     * @brief Axis calibration and shaping specification.
-     */
+ * @brief Axis calibration and shaping specification.
+ */
 struct RcAxisSpec
 {
     std::int16_t raw_lo{1000};     ///< Lower calibrated receiver value in microseconds.
@@ -60,8 +60,8 @@ struct RcAxisSpec
 static constexpr std::size_t kRcMaxSwitchVals = 8u; ///< Maximum switch positions supported by one role.
 
 /**
-     * @brief Discrete switch specification.
-     */
+ * @brief Discrete switch specification.
+ */
 struct RcSwitchSpec
 {
     std::uint8_t count{0};                       ///< Number of logical output positions.
@@ -76,8 +76,8 @@ struct RcSwitchSpec
 };
 
 /**
-     * @brief Complete specification for one logical receiver role.
-     */
+ * @brief Complete specification for one logical receiver role.
+ */
 struct RcChannelSpec
 {
     ChannelKind kind{ChannelKind::Axis}; ///< Active specification type.
@@ -85,11 +85,11 @@ struct RcChannelSpec
     RcSwitchSpec sw{};                   ///< Switch specification.
 
     /**
-         * @brief Build an axis channel specification.
-         *
-         * @param a Axis settings to copy.
-         * @return Configured channel specification.
-         */
+     * @brief Build an axis channel specification.
+     *
+     * @param a Axis settings to copy.
+     * @return Configured channel specification.
+     */
     static RcChannelSpec makeAxis(const RcAxisSpec &a)
     {
         RcChannelSpec s;
@@ -99,11 +99,11 @@ struct RcChannelSpec
     }
 
     /**
-         * @brief Build a switch channel specification.
-         *
-         * @param w Switch settings to copy.
-         * @return Configured channel specification.
-         */
+     * @brief Build a switch channel specification.
+     *
+     * @param w Switch settings to copy.
+     * @return Configured channel specification.
+     */
     static RcChannelSpec makeSwitch(const RcSwitchSpec &w)
     {
         RcChannelSpec s;
@@ -114,8 +114,8 @@ struct RcChannelSpec
 };
 
 /**
-     * @brief Per-role output policy used when RCLink must fail safe.
-     */
+ * @brief Per-role output policy used when RCLink must fail safe.
+ */
 struct Failsafe
 {
     enum class Mode : std::uint8_t
@@ -131,8 +131,8 @@ struct Failsafe
 };
 
 /**
-     * @brief First configuration problem found while validating a link.
-     */
+ * @brief First configuration problem found while validating a link.
+ */
 enum class RcConfigError : std::uint8_t
 {
     None,
@@ -156,8 +156,8 @@ enum class RcConfigError : std::uint8_t
 };
 
 /**
-     * @brief Result returned when a configuration is activated.
-     */
+ * @brief Result returned when a configuration is activated.
+ */
 struct RcConfigResult
 {
     bool ok;              ///< True when the complete configuration is usable.
@@ -165,14 +165,25 @@ struct RcConfigResult
     std::size_t role;     ///< Logical role index associated with the error.
     std::uint8_t channel; ///< Receiver channel associated with the error, when applicable.
 
-    /// @brief Construct a configuration result with optional failure context.
+    /**
+     * @brief Construct a configuration result with optional failure context.
+     *
+     * @param success Whether activation succeeded.
+     * @param why First validation failure, or None.
+     * @param role_index Logical role implicated in the failure.
+     * @param receiver_channel Receiver channel, or kInvalidChannel when not applicable.
+     */
     RcConfigResult(bool success = false, RcConfigError why = RcConfigError::None, std::size_t role_index = 0u,
                    std::uint8_t receiver_channel = kInvalidChannel) noexcept
         : ok(success), error(why), role(role_index), channel(receiver_channel)
     {
     }
 
-    /// @brief Return true when configuration activation succeeded.
+    /**
+     * @brief Return true when configuration activation succeeded.
+     *
+     * @return Stored success flag; construction does not perform validation.
+     */
     explicit operator bool() const noexcept
     {
         return ok;
@@ -180,8 +191,8 @@ struct RcConfigResult
 };
 
 /**
-     * @brief Result returned when configuring a receiver failsafe signature.
-     */
+ * @brief Result returned when configuring a receiver failsafe signature.
+ */
 enum class RcSignatureError : std::uint8_t
 {
     None,
@@ -189,20 +200,29 @@ enum class RcSignatureError : std::uint8_t
 };
 
 /**
-     * @brief Result returned when configuring a receiver failsafe signature.
-     */
+ * @brief Result returned when configuring a receiver failsafe signature.
+ */
 struct RcSignatureResult
 {
     bool ok;                ///< True when the signature was accepted.
     RcSignatureError error; ///< Validation result.
 
-    /// @brief Construct a receiver-signature validation result.
+    /**
+     * @brief Construct a receiver-signature validation result.
+     *
+     * @param success Whether the signature was accepted.
+     * @param why Validation failure, or None.
+     */
     RcSignatureResult(bool success = false, RcSignatureError why = RcSignatureError::None) noexcept
         : ok(success), error(why)
     {
     }
 
-    /// @brief Return true when the receiver signature was accepted.
+    /**
+     * @brief Return true when the receiver signature was accepted.
+     *
+     * @return Stored success flag; construction does not perform validation.
+     */
     explicit operator bool() const noexcept
     {
         return ok;
@@ -210,12 +230,12 @@ struct RcSignatureResult
 };
 
 /**
-     * @brief Unified runtime state for the receiver link.
-     *
-     * `link_ok` answers only whether an accepted transport frame is fresh.
-     * `healthy` additionally requires a valid RCLink configuration, all required
-     * roles to be valid, and no receiver/protocol failsafe condition.
-     */
+ * @brief Unified runtime state for the receiver link.
+ *
+ * `link_ok` answers only whether an accepted transport frame is fresh.
+ * `healthy` additionally requires a valid RCLink configuration, all required
+ * roles to be valid, and no receiver/protocol failsafe condition.
+ */
 struct RcLinkStatus
 {
     bool has_frame{false};            ///< At least one transport frame has been accepted.
@@ -244,16 +264,16 @@ struct RcLinkStatus
 };
 
 /**
-     * @brief Latest application-space values for N logical roles.
-     */
+ * @brief Latest application-space values for N logical roles.
+ */
 template <std::size_t N> struct RcFrame
 {
     std::int16_t vals[N]{}; ///< Scaled/safe values in logical-role order.
 };
 
 /**
-     * @brief Receiver-failsafe signature rule in scaled application space.
-     */
+ * @brief Receiver-failsafe signature rule in scaled application space.
+ */
 template <std::size_t N> struct RcFailsafeRule
 {
     std::int16_t expected[N]{}; ///< Expected output for each checked role.

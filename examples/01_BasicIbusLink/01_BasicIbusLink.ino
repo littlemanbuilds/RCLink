@@ -13,15 +13,18 @@
  *
  */
 
+#define RCLINK_NO_LEGACY_GLOBAL_ALIASES // Use the namespace API in this self-contained sketch.
 #include <RCLink.h>
 
 #include <Arduino.h>
+
+using namespace rc;
 
 // ---- Hardware configuration ---- //
 
 const int RX_PIN = 18;
 const int TX_PIN = -1; // iBUS reception does not use TX.
-const uint32_t IBUS_BAUD = 115200;
+const uint32_t IBUS_BAUD = 115200; // Exact-width UART baud argument; 115200 exceeds a 16-bit int.
 
 // ---- Application roles ---- //
 
@@ -33,8 +36,8 @@ RC_DECLARE_ROLES(BasicRole, BASIC_ROLES)
 
 // The transport owns iBUS byte reception. RcLink validates, maps, shapes, and
 // exposes those receiver values as the application roles above.
-rc::RcIbusTransport transport;
-rc::RcLink<rc::RcIbusTransport, BasicRole> rclink(transport);
+RcIbusTransport transport;
+RcLink<RcIbusTransport, BasicRole> rclink(transport);
 
 // ---- Setup ---- //
 
@@ -52,7 +55,7 @@ void setup()
     config.axis(BasicRole::Throttle).raw(1000, 2000, 1000).out(0.0f, 100.0f).done();
     config.sw(BasicRole::Mode).raw_levels({1000, 2000}).values({0.0f, 1.0f}).done();
 
-    const rc::RcConfigResult result = rclink.apply_config(config);
+    const RcConfigResult result = rclink.apply_config(config);
     if (!result)
     {
         Serial.println(F("RCLink configuration rejected."));
@@ -68,8 +71,7 @@ void loop()
     // Polling update() frequently is required to drain receiver bytes and track freshness.
     rclink.update();
 
-    static bool printed_healthy_frame = false;
-    if (rclink.healthy() && (!printed_healthy_frame || rclink.changed()))
+    if (rclink.healthy())
     {
         Serial.print(F("steering="));
         Serial.print(rclink.read(BasicRole::Steering));
@@ -77,8 +79,6 @@ void loop()
         Serial.print(rclink.read(BasicRole::Throttle));
         Serial.print(F(" mode="));
         Serial.println(rclink.read(BasicRole::Mode));
-        printed_healthy_frame = true;
     }
-    else if (!rclink.healthy())
-        printed_healthy_frame = false;
+    delay(10); // Limit serial output while continuing to service receiver bytes.
 }

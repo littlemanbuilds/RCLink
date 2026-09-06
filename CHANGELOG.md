@@ -2,6 +2,8 @@
 
 All notable RCLink changes are documented here.
 
+## [Unreleased]
+
 ## [1.2.0] - 2026-08-30
 
 ### Fixed

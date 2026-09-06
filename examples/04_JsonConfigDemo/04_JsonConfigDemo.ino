@@ -10,15 +10,15 @@
  *
  */
 
+#define RCLINK_NO_LEGACY_GLOBAL_ALIASES // Use the namespace API in this self-contained sketch.
 #include <RCLink.h>
 
-#include <Arduino.h>
 
 // ---- Wiring configuration ---- //
 
 const int RX_PIN = 18;
 const int TX_PIN = -1;
-const uint32_t IBUS_BAUD = 115200;
+const uint32_t IBUS_BAUD = 115200; // Exact-width UART baud argument; 115200 exceeds a 16-bit int.
 
 // ---- Roles (same as previous demo) ---- //
 
@@ -36,6 +36,9 @@ const uint32_t IBUS_BAUD = 115200;
 RC_DECLARE_ROLES(RC, RC_ROLES)
 
 #include <Json.hpp> // Must come after RC_DECLARE_ROLES so role names can be matched.
+#include <Arduino.h>
+
+using namespace rc;
 
 // ---- Transport and link ---- //
 
@@ -86,8 +89,8 @@ void setup()
     rclink.begin(Serial2, IBUS_BAUD, RX_PIN, TX_PIN);
 
     RC_CONFIG(RC, cfg);
-    const bool json_loaded = rc::load_json(RC{}, cfg, kJsonConfig);
-    const rc::RcConfigResult result = json_loaded ? rclink.apply_config(cfg) : rc::RcConfigResult(false);
+    const bool json_loaded = load_json(RC{}, cfg, kJsonConfig);
+    const RcConfigResult result = json_loaded ? rclink.apply_config(cfg) : RcConfigResult(false);
 
     if (!json_loaded || !result)
     {

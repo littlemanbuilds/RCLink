@@ -22,18 +22,18 @@ namespace rc
 namespace detail
 {
 /**
-         * @brief Decode Flysky-style iBUS channel frames without Arduino dependencies.
-         *
-         * Feed bytes in arrival order. A partial frame is discarded after an inter-byte
-         * timeout, while malformed data is re-synchronized one byte at a time so a valid
-         * frame immediately following corruption can still be recovered.
-         */
+ * @brief Decode Flysky-style iBUS channel frames without Arduino dependencies.
+ *
+ * Feed bytes in arrival order. A partial frame is discarded after an inter-byte
+ * timeout, while malformed data is re-synchronized one byte at a time so a valid
+ * frame immediately following corruption can still be recovered.
+ */
 class IbusDecoder
 {
   public:
     /**
-             * @brief Reset parser state and all diagnostic counters.
-             */
+     * @brief Reset parser state and all diagnostic counters.
+     */
     void reset() noexcept
     {
         count_ = 0u;
@@ -52,12 +52,12 @@ class IbusDecoder
     }
 
     /**
-             * @brief Feed one byte into the parser.
-             *
-             * @param byte Next UART byte.
-             * @param now_ms Timestamp associated with this parser service point.
-             * @return True when this byte completes a valid channel frame.
-             */
+     * @brief Feed one byte into the parser.
+     *
+     * @param byte Next UART byte.
+     * @param now_ms Timestamp associated with this parser service point.
+     * @return True when this byte completes a valid channel frame.
+     */
     bool feed(std::uint8_t byte, std::uint32_t now_ms) noexcept
     {
         tick(now_ms);
@@ -109,6 +109,7 @@ class IbusDecoder
                 continue;
             }
 
+            // Slide by one byte: a valid frame may start inside the rejected candidate.
             ++crc_errors_;
             discard_front_(1u);
         }
@@ -119,10 +120,10 @@ class IbusDecoder
     }
 
     /**
-             * @brief Service the partial-frame timeout even when no new bytes arrived.
-             *
-             * @param now_ms Current timestamp.
-             */
+     * @brief Service the partial-frame timeout even when no new bytes arrived.
+     *
+     * @param now_ms Current timestamp.
+     */
     void tick(std::uint32_t now_ms) noexcept
     {
         if (count_ != 0u && has_last_byte_ &&
@@ -136,19 +137,21 @@ class IbusDecoder
     }
 
     /**
-             * @brief Number of channels in the last accepted frame.
-             */
+     * @brief Number of channels in the last accepted frame.
+     *
+     * @return Last accepted channel count, or zero after reset.
+     */
     int channels() const noexcept
     {
         return static_cast<int>(channel_count_);
     }
 
     /**
-             * @brief Read a channel from the last accepted frame.
-             *
-             * @param channel Zero-based channel index.
-             * @return Raw microseconds, or zero when unavailable.
-             */
+     * @brief Read a channel from the last accepted frame.
+     *
+     * @param channel Zero-based channel index.
+     * @return Raw microseconds, or zero when unavailable.
+     */
     int readRaw(int channel) const noexcept
     {
         return (channel >= 0 && static_cast<std::size_t>(channel) < static_cast<std::size_t>(channel_count_))
@@ -156,43 +159,71 @@ class IbusDecoder
                    : 0;
     }
 
-    /// @brief Return validity bits for channels in the last accepted frame.
+    /**
+     * @brief Return validity bits for channels in the last accepted frame.
+     *
+     * @return Bits 0 through channels()-1; zero after reset, with no freshness or plausibility check.
+     */
     std::uint32_t channelValidMask() const noexcept
     {
         return channel_valid_mask_;
     }
 
-    /// @brief Return the accepted frame count.
+    /**
+     * @brief Return the accepted frame count.
+     *
+     * @return Accepted-frame counter since reset; wraps modulo 2^32.
+     */
     std::uint32_t frames() const noexcept
     {
         return frames_;
     }
 
-    /// @brief Return the checksum failure count.
+    /**
+     * @brief Return the checksum failure count.
+     *
+     * @return Checksum-failure counter since reset; wraps modulo 2^32.
+     */
     std::uint32_t crcErrors() const noexcept
     {
         return crc_errors_;
     }
 
-    /// @brief Return the framing and format failure count.
+    /**
+     * @brief Return the framing and format failure count.
+     *
+     * @return Framing/format failure counter since reset; wraps modulo 2^32.
+     */
     std::uint32_t parseErrors() const noexcept
     {
         return parse_errors_;
     }
 
-    /// @brief Return the partial-frame timeout count.
+    /**
+     * @brief Return the partial-frame timeout count.
+     *
+     * @return Partial-frame timeout counter since reset; wraps modulo 2^32.
+     */
     std::uint32_t parserTimeouts() const noexcept
     {
         return timeout_resets_;
     }
 
-    /// @brief Return bytes discarded during parser recovery.
+    /**
+     * @brief Return bytes discarded during parser recovery.
+     *
+     * @return Recovery-discarded byte counter since reset; wraps modulo 2^32.
+     */
     std::uint32_t discardedBytes() const noexcept
     {
         return discarded_bytes_;
     }
 
-    /// @brief Return the timestamp of the last accepted frame.
+    /**
+     * @brief Return the timestamp of the last accepted frame.
+     *
+     * @return Last accepted frame timestamp in milliseconds; zero also represents reset.
+     */
     std::uint32_t lastGoodMs() const noexcept
     {
         return last_good_ms_;
@@ -203,7 +234,12 @@ class IbusDecoder
     static constexpr std::uint8_t kChannelCommand = 0x40u; ///< iBUS servo-channel command byte.
     static constexpr std::uint8_t kMinimumFrameBytes = 6u; ///< Smallest structurally valid channel frame.
 
-    /// @brief Check whether a length byte can describe a supported channel frame.
+    /**
+     * @brief Check whether a length byte can describe a supported channel frame.
+     *
+     * @param length Candidate total frame length in bytes.
+     * @return True for an even channel payload within decoder capacity.
+     */
     static bool plausible_length_(std::uint8_t length) noexcept
     {
         if (length < kMinimumFrameBytes || static_cast<std::size_t>(length) > kBufferBytes)
@@ -213,7 +249,12 @@ class IbusDecoder
                static_cast<std::size_t>(channel_bytes / 2u) <= static_cast<std::size_t>(kIbusMaxChannels);
     }
 
-    /// @brief Validate the little-endian subtractive checksum of a buffered frame.
+    /**
+     * @brief Validate the little-endian subtractive checksum of a buffered frame.
+     *
+     * @param length Structurally valid total length already buffered in full.
+     * @return True when the buffered subtractive checksum matches.
+     */
     bool checksum_valid_(std::uint8_t length) const noexcept
     {
         std::uint16_t checksum = 0xFFFFu;
@@ -228,7 +269,11 @@ class IbusDecoder
         return checksum == received;
     }
 
-    /// @brief Decode channel words from a validated buffered frame.
+    /**
+     * @brief Decode channel words from a validated buffered frame.
+     *
+     * @param length Validated total frame length; checksum must already have passed.
+     */
     void decode_(std::uint8_t length) noexcept
     {
         const std::size_t channel_bytes = static_cast<std::size_t>(length) - 4u;
@@ -249,7 +294,11 @@ class IbusDecoder
         }
     }
 
-    /// @brief Discard and diagnose bytes from the front of the sliding buffer.
+    /**
+     * @brief Discard and diagnose bytes from the front of the sliding buffer.
+     *
+     * @param count Requested prefix length, clamped to buffered bytes.
+     */
     void discard_front_(std::size_t count) noexcept
     {
         if (count > count_)
@@ -258,7 +307,11 @@ class IbusDecoder
         shift_front_(count);
     }
 
-    /// @brief Consume accepted bytes without counting them as recovery discards.
+    /**
+     * @brief Consume accepted bytes without counting them as recovery discards.
+     *
+     * @param count Accepted prefix length, clamped to buffered bytes.
+     */
     void consume_front_(std::size_t count) noexcept
     {
         if (count > count_)
@@ -266,7 +319,11 @@ class IbusDecoder
         shift_front_(count);
     }
 
-    /// @brief Shift remaining buffered bytes after removing a front prefix.
+    /**
+     * @brief Shift remaining buffered bytes after removing a front prefix.
+     *
+     * @param count Prefix length no greater than the buffered byte count.
+     */
     void shift_front_(std::size_t count) noexcept
     {
         const std::size_t remaining = count_ - count;

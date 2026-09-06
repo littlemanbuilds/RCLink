@@ -22,24 +22,24 @@
 namespace rc
 {
 /**
-     * @brief iBUS receiver transport using an Arduino Stream-compatible serial port.
-     *
-     * ESP32 targets configure the requested RX pin explicitly. On other Arduino
-     * architectures the serial object owns its physical pins, so rxPin/txPin are
-     * accepted for source compatibility but ignored.
-     */
+ * @brief iBUS receiver transport using an Arduino Stream-compatible serial port.
+ *
+ * ESP32 targets configure the requested RX pin explicitly. On other Arduino
+ * architectures the serial object owns its physical pins, so rxPin/txPin are
+ * accepted for source compatibility but ignored.
+ */
 class RcIbusTransport
 {
   public:
     /**
-         * @brief Start iBUS reception.
-         *
-         * @tparam SerialT Arduino serial type derived from Stream.
-         * @param port Serial object used for receiver input.
-         * @param baud Receiver baud rate, normally 115200.
-         * @param rxPin RX GPIO on ESP32; ignored on fixed-pin serial implementations.
-         * @param txPin Unused for RX-only iBUS.
-         */
+     * @brief Start iBUS reception.
+     *
+     * @tparam SerialT Arduino serial type derived from Stream.
+     * @param port Serial object used for receiver input.
+     * @param baud Receiver baud rate, normally 115200.
+     * @param rxPin RX GPIO on ESP32; ignored on fixed-pin serial implementations.
+     * @param txPin Unused for RX-only iBUS.
+     */
     template <typename SerialT> void begin(SerialT &port, std::uint32_t baud, int rxPin, int txPin)
     {
         (void)txPin;
@@ -54,10 +54,10 @@ class RcIbusTransport
     }
 
     /**
-         * @brief Attach an already configured Stream without reconfiguring its UART.
-         *
-         * @param stream Stream to poll.
-         */
+     * @brief Attach an already configured Stream without reconfiguring its UART.
+     *
+     * @param stream Stream to poll.
+     */
     void attach(Stream &stream) noexcept
     {
         port_ = &stream;
@@ -65,11 +65,11 @@ class RcIbusTransport
     }
 
     /**
-         * @brief Drain available bytes and update the decoder.
-         *
-         * @param now_ms Timestamp used for inter-byte timeout accounting.
-         * @return True when one or more complete valid frames were decoded.
-         */
+     * @brief Drain available bytes and update the decoder.
+     *
+     * @param now_ms Timestamp used for inter-byte timeout accounting.
+     * @return True when one or more complete valid frames were decoded.
+     */
     bool update(std::uint32_t now_ms)
     {
         bool new_frame = false;
@@ -84,84 +84,131 @@ class RcIbusTransport
     }
 
     /**
-         * @brief Arduino convenience overload using millis().
-         */
+     * @brief Arduino convenience overload using millis().
+     *
+     * @return True when this poll decodes at least one valid frame.
+     */
     bool update()
     {
         return update(static_cast<std::uint32_t>(millis()));
     }
 
-    /// @brief Return the channel count from the last accepted frame.
+    /**
+     * @brief Return the channel count from the last accepted frame.
+     *
+     * @return Last accepted channel count, or zero after reset.
+     */
     int channels() const noexcept
     {
         return decoder_.channels();
     }
 
-    /// @brief Read one raw receiver channel in microseconds.
+    /**
+     * @brief Read one raw receiver channel in microseconds.
+     *
+     * @param ch Zero-based analogue channel index.
+     * @return Last accepted raw microseconds; zero for an unavailable index.
+     */
     int readRaw(int ch) const noexcept
     {
         return decoder_.readRaw(ch);
     }
 
-    /// @brief Return false because iBUS has no protocol failsafe bit.
+    /**
+     * @brief Return false because iBUS has no protocol failsafe bit.
+     *
+     * @return Always false; iBUS carries no failsafe bit.
+     */
     bool protoFailsafe() const noexcept
     {
         return false;
     }
 
-    /// @brief Return false because iBUS has no frame-lost bit.
+    /**
+     * @brief Return false because iBUS has no frame-lost bit.
+     *
+     * @return Always false; iBUS carries no frame-lost bit.
+     */
     bool frameLost() const noexcept
     {
         return false;
     }
 
-    /// @brief Return the accepted frame count.
+    /**
+     * @brief Return the accepted frame count.
+     *
+     * @return Accepted-frame counter since reset; wraps modulo 2^32.
+     */
     std::uint32_t frames() const noexcept
     {
         return decoder_.frames();
     }
 
-    /// @brief Return the checksum failure count.
+    /**
+     * @brief Return the checksum failure count.
+     *
+     * @return Checksum-failure counter since reset; wraps modulo 2^32.
+     */
     std::uint32_t crcErrors() const noexcept
     {
         return decoder_.crcErrors();
     }
 
-    /// @brief Return the framing and format failure count.
+    /**
+     * @brief Return the framing and format failure count.
+     *
+     * @return Framing/format failure counter since reset; wraps modulo 2^32.
+     */
     std::uint32_t parseErrors() const noexcept
     {
         return decoder_.parseErrors();
     }
 
-    /// @brief Return the partial-frame timeout count.
+    /**
+     * @brief Return the partial-frame timeout count.
+     *
+     * @return Partial-frame timeout counter since reset; wraps modulo 2^32.
+     */
     std::uint32_t parserTimeouts() const noexcept
     {
         return decoder_.parserTimeouts();
     }
 
-    /// @brief Return bytes discarded during parser recovery.
+    /**
+     * @brief Return bytes discarded during parser recovery.
+     *
+     * @return Recovery-discarded byte counter since reset; wraps modulo 2^32.
+     */
     std::uint32_t discardedBytes() const noexcept
     {
         return decoder_.discardedBytes();
     }
 
-    /// @brief Return validity bits for channels in the last accepted frame.
+    /**
+     * @brief Return validity bits for channels in the last accepted frame.
+     *
+     * @return Bits 0 through channels()-1; zero after reset, with no freshness or plausibility check.
+     */
     std::uint32_t channelValidMask() const noexcept
     {
         return decoder_.channelValidMask();
     }
 
-    /// @brief Return the timestamp of the last accepted frame.
+    /**
+     * @brief Return the timestamp of the last accepted frame.
+     *
+     * @return Last accepted frame timestamp in milliseconds; zero also represents reset.
+     */
     std::uint32_t lastGoodMs() const noexcept
     {
         return decoder_.lastGoodMs();
     }
 
     /**
-         * @brief Describe transport capabilities.
-         *
-         * @return iBUS capability flags.
-         */
+     * @brief Describe transport capabilities.
+     *
+     * @return iBUS capability flags.
+     */
     RcTransportCaps caps() const noexcept
     {
         RcTransportCaps c;

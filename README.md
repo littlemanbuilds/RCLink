@@ -1101,8 +1101,18 @@ RCLink/
 
 ## Version history
 
-See [CHANGELOG.md](CHANGELOG.md) for released changes and compatibility notes.
+Current version:
+
+```text
+1.2.0
+```
+
+See [CHANGELOG.md](CHANGELOG.md) for detailed release history.
+
+---
 
 ## License
 
-MIT. See `LICENSE`.
+RCLink is released under the **MIT License**. See [LICENSE](LICENSE).
+
+Copyright © 2026 Little Man Builds (Darren Osborne).

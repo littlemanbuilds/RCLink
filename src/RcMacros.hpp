@@ -30,7 +30,12 @@
 
 namespace rc
 {
-/// @brief Return a generated role name for an enum-like role type.
+/**
+ * @brief Return a generated role name for an enum-like role type.
+ *
+ * @tparam EnumLike Role enum with an RC_DECLARE_ROLES specialization.
+ * @return Static role name, or "Unknown" for an out-of-range value.
+ */
 template <typename EnumLike> inline const char *to_string(EnumLike);
 } // namespace rc
 
@@ -44,14 +49,33 @@ template <typename EnumLike> inline const char *to_string(EnumLike);
  * @brief Generate global role-helper wrappers retained for v1.x source compatibility.
  */
 #define RC__LEGACY_ROLE_HELPERS(EnumName)                                                                              \
+    /** \
+     * @brief Forward role-name lookup for legacy global callers. \
+     * \
+     * @param role Declared role value. \
+     * @return Static role name, or "Unknown" when out of range. \
+     */ \
     inline const char *to_string(EnumName role)                                                                        \
     {                                                                                                                  \
         return ::rc::to_string(role);                                                                                  \
     }                                                                                                                  \
+    /** \
+     * @brief Forward the role count for legacy global callers. \
+     * \
+     * @param tag Type-selection tag; its value is ignored. \
+     * @return Number of declared roles, excluding Count. \
+     */ \
     inline constexpr std::size_t role_count(EnumName tag)                                                              \
     {                                                                                                                  \
         return ::rc::role_count(tag);                                                                                  \
     }                                                                                                                  \
+    /** \
+     * @brief Forward bounds-checked role iteration for legacy global callers. \
+     * \
+     * @param tag Type-selection tag; its value is ignored. \
+     * @param index Zero-based role ordinal. \
+     * @return Role at index, or EnumName::Count when out of range. \
+     */ \
     inline constexpr EnumName role_by_index(EnumName tag, std::size_t index)                                           \
     {                                                                                                                  \
         return ::rc::role_by_index(tag, index);                                                                        \
@@ -67,6 +91,7 @@ template <typename EnumLike> inline const char *to_string(EnumLike);
  * - `rc::to_string(EnumName)` → `const char*` role name
  * - `rc::role_count(EnumName)` → number of roles (`constexpr`)
  * - `rc::role_by_index(EnumName, i)` → enum from ordinal index
+ *
  * @code
  * #define MY_ROLES(_) \
  *   _(A) _(B) _(C)
@@ -84,6 +109,12 @@ template <typename EnumLike> inline const char *to_string(EnumLike);
     static const char *const EnumName##_names[] = {ROLE_LIST(RC__ENUM_NAME)};                                          \
                                                                                                                        \
     /* Generated role-name lookup. */                                                                                  \
+    /** \
+     * @brief Look up a declared role name. \
+     * \
+     * @param r Role value to name. \
+     * @return Static name string, or "Unknown" for an invalid role. \
+     */ \
     inline const char *to_string(EnumName r)                                                                           \
     {                                                                                                                  \
         const std::size_t i = static_cast<std::size_t>(r);                                                             \
@@ -92,6 +123,12 @@ template <typename EnumLike> inline const char *to_string(EnumLike);
                                                                                                                        \
     /* Template specialization so calls bound at template-definition time to */                                        \
     /* rc::to_string<EnumName>(EnumName) link correctly. */                                                            \
+    /** \
+     * @brief Resolve template-bound calls to the generated role-name lookup. \
+     * \
+     * @param r Role value to name. \
+     * @return Static name string, or "Unknown" for an invalid role. \
+     */ \
     template <> inline const char *to_string<EnumName>(EnumName r)                                                     \
     {                                                                                                                  \
         const std::size_t i = static_cast<std::size_t>(r);                                                             \
@@ -99,12 +136,23 @@ template <typename EnumLike> inline const char *to_string(EnumLike);
     }                                                                                                                  \
                                                                                                                        \
     /* Generated role-count lookup. */                                                                                 \
+    /** \
+     * @brief Count the declared roles. \
+     * \
+     * @return Number of roles, excluding the Count sentinel. \
+     */ \
     inline constexpr std::size_t role_count(EnumName /*tag*/)                                                          \
     {                                                                                                                  \
         return static_cast<std::size_t>(EnumName::Count);                                                              \
     }                                                                                                                  \
                                                                                                                        \
     /* Generated bounds-checked ordinal lookup. */                                                                     \
+    /** \
+     * @brief Convert an ordinal to a declared role. \
+     * \
+     * @param i Zero-based ordinal to resolve. \
+     * @return Role at i, or EnumName::Count when out of range. \
+     */ \
     inline constexpr EnumName role_by_index(EnumName /*tag*/, std::size_t i)                                           \
     {                                                                                                                  \
         return (i < static_cast<std::size_t>(EnumName::Count)) ? static_cast<EnumName>(i) : EnumName::Count;           \
@@ -125,6 +173,7 @@ template <typename EnumLike> inline const char *to_string(EnumLike);
  * @brief Map roles to receiver channels in order starting at BASE_CH.
  *
  * Consistent ordering: (EnumName, CFG, BASE_CH).
+ *
  * @code
  * RC_CFG_MAP_RANGE(Flysky, cfg, 0);  // role0->ch0, role1->ch1, ...
  * @endcode
@@ -145,6 +194,7 @@ template <typename EnumLike> inline const char *to_string(EnumLike);
  * @brief Map roles to channels in declared order with base = 0.
  *
  * Consistent ordering: (EnumName, CFG).
+ *
  * @code
  * RC_CFG_MAP_DEFAULT(Flysky, cfg);
  * @endcode
@@ -157,8 +207,12 @@ template <typename EnumLike> inline const char *to_string(EnumLike);
 namespace rc
 {
 /**
-     * @brief Print all roles/values from a link.
-     */
+ * @brief Print all roles/values from a link.
+ *
+ * @tparam Transport Receiver transport type used by the link.
+ * @tparam E Generated role enum ending in Count.
+ * @param link Link whose exposed outputs are printed to Serial.
+ */
 template <class Transport, typename E> static inline void print_all(const RcLink<Transport, E> &link, E)
 {
     for (std::size_t i = 0; i < static_cast<std::size_t>(E::Count); ++i)
@@ -174,8 +228,12 @@ template <class Transport, typename E> static inline void print_all(const RcLink
 }
 
 /**
-     * @brief Print all roles/values from a frame snapshot.
-     */
+ * @brief Print all roles/values from a frame snapshot.
+ *
+ * @tparam E Generated role enum whose Count must not exceed N.
+ * @tparam N Number of values in the frame.
+ * @param frame Snapshot to print to Serial in role order.
+ */
 template <typename E, std::size_t N> static inline void print_all(const RcFrame<N> &frame, E)
 {
     for (std::size_t i = 0; i < static_cast<std::size_t>(E::Count); ++i)
@@ -195,6 +253,7 @@ template <typename E, std::size_t N> static inline void print_all(const RcFrame<
  * @brief Print "RoleName: value, RoleName: value, ..." for all roles, then newline.
  *
  * Accepts either a RcLink<...> or an RcFrame<N> thanks to overloads above.
+ *
  * @code
  * RC_PRINT_ALL(rclink, Flysky);
  * RC_PRINT_ALL(rclink.failsafe_expected_frame(), Flysky);
@@ -206,6 +265,7 @@ template <typename E, std::size_t N> static inline void print_all(const RcFrame<
 
 /**
  * @brief Iterate roles and run a simple statement block (no lambdas/templates).
+ *
  * @code
  * RC_FOR_EACH_ROLE(Flysky, {
  *   // available: role (EnumName), i (std::size_t)
@@ -229,31 +289,32 @@ template <typename E, std::size_t N> static inline void print_all(const RcFrame<
  * These helpers construct `RcFailsafeRule` instances sized to role enum,
  *          then apply them via `RcLink::set_failsafe_signature()`. They operate on the
  *          **scaled** space (application values), not raw microseconds.
+ *
  * @note E must be an enum declared via RC_DECLARE_ROLES and end with `Count`.
  */
 namespace rc
 {
 /**
-     * @brief Shorthand alias for a failsafe rule sized to an enum E.
-     *
-     * @tparam E  Role enum type (must end with Count).
-     */
+ * @brief Shorthand alias for a failsafe rule sized to an enum E.
+ *
+ * @tparam E  Role enum type (must end with Count).
+ */
 template <typename E> using FsRule = RcFailsafeRule<static_cast<std::size_t>(E::Count)>;
 
 /**
-     * @brief Build a signature that checks ALL roles against the same expected value.
-     *
-     * @tparam E Role enum type.
-     * @param tag Enum tag instance, e.g. Flysky{} (type-only).
-     * @param expected Expected value (scaled units) for every role.
-     * @param tol Tolerance (± in scaled counts).
-     * @param hold_ms Must match for at least this many milliseconds.
-     * @return FsRule<E> Configured rule.
-     * @code
-     * // Everyone expected at zero (±3) for ≥250 ms:
-     * auto sig = rc::make_signature_all(Flysky{}, 0, 3, 250);
-     * @endcode
-     */
+ * @brief Build a signature that checks ALL roles against the same expected value.
+ *
+ * @tparam E Role enum type.
+ * @param tag Enum tag instance, e.g. Flysky{} (type-only).
+ * @param expected Expected value (scaled units) for every role.
+ * @param tol Tolerance (± in scaled counts).
+ * @param hold_ms Must match for at least this many milliseconds.
+ * @return FsRule<E> Configured rule.
+ * @code
+ * // Everyone expected at zero (±3) for ≥250 ms:
+ * auto sig = rc::make_signature_all(Flysky{}, 0, 3, 250);
+ * @endcode
+ */
 template <typename E>
 FsRule<E> make_signature_all(E /*tag*/, std::int16_t expected, std::uint16_t tol, std::uint16_t hold_ms)
 {
@@ -270,22 +331,22 @@ FsRule<E> make_signature_all(E /*tag*/, std::int16_t expected, std::uint16_t tol
 }
 
 /**
-     * @brief Build a signature with a default expected value, plus per-role overrides.
-     *
-     * @tparam E Role enum type.
-     * @param tag Enum tag instance (type-only).
-     * @param default_expected Default expected value (scaled units) for all roles.
-     * @param tol Tolerance (± in scaled counts).
-     * @param hold_ms Must match for at least this many milliseconds.
-     * @param overrides List of {role, expected} pairs to override specific roles.
-     * @return FsRule<E> Configured rule.
-     * @code
-     * auto sig = rc::make_signature_with_overrides(
-     *   Flysky{}, [default=0], [tol=3], [hold_ms=250],
-     *   { {Flysky::Ch3_LV, 10} } // throttle = 10; all others use default
-     * );
-     * @endcode
-     */
+ * @brief Build a signature with a default expected value, plus per-role overrides.
+ *
+ * @tparam E Role enum type.
+ * @param tag Enum tag instance (type-only).
+ * @param default_expected Default expected value (scaled units) for all roles.
+ * @param tol Tolerance (± in scaled counts).
+ * @param hold_ms Must match for at least this many milliseconds.
+ * @param overrides List of {role, expected} pairs to override specific roles.
+ * @return FsRule<E> Configured rule.
+ * @code
+ * auto sig = rc::make_signature_with_overrides(
+ *   Flysky{}, [default=0], [tol=3], [hold_ms=250],
+ *   { {Flysky::Ch3_LV, 10} } // throttle = 10; all others use default
+ * );
+ * @endcode
+ */
 template <typename E>
 FsRule<E> make_signature_with_overrides(E /*tag*/, std::int16_t default_expected, std::uint16_t tol,
                                         std::uint16_t hold_ms,
@@ -305,22 +366,22 @@ FsRule<E> make_signature_with_overrides(E /*tag*/, std::int16_t default_expected
 }
 
 /**
-     * @brief Build a signature that checks ONLY the provided roles (others ignored).
-     *
-     * @tparam E Role enum type.
-     * @param tag Enum tag instance (type-only).
-     * @param tol Tolerance (± in scaled counts).
-     * @param hold_ms Must match for at least this many milliseconds.
-     * @param selected List of {role, expected} pairs to check. All others ignored.
-     * @return FsRule<E> Configured rule.
-     * @code
-     * auto sig = rc::make_signature_selected(
-     *   Flysky{}, [tol=3], [hold_ms=250],
-     *   { {Flysky::Ch1_RH, 0}, {Flysky::Ch2_RV, 0},
-     *     {Flysky::Ch3_LV, 0}, {Flysky::Ch4_LH, 0} }
-     * );
-     * @endcode
-     */
+ * @brief Build a signature that checks ONLY the provided roles (others ignored).
+ *
+ * @tparam E Role enum type.
+ * @param tag Enum tag instance (type-only).
+ * @param tol Tolerance (± in scaled counts).
+ * @param hold_ms Must match for at least this many milliseconds.
+ * @param selected List of {role, expected} pairs to check. All others ignored.
+ * @return FsRule<E> Configured rule.
+ * @code
+ * auto sig = rc::make_signature_selected(
+ *   Flysky{}, [tol=3], [hold_ms=250],
+ *   { {Flysky::Ch1_RH, 0}, {Flysky::Ch2_RV, 0},
+ *     {Flysky::Ch3_LV, 0}, {Flysky::Ch4_LH, 0} }
+ * );
+ * @endcode
+ */
 template <typename E>
 FsRule<E> make_signature_selected(E /*tag*/, std::uint16_t tol, std::uint16_t hold_ms,
                                   std::initializer_list<std::pair<E, std::int16_t>> selected)
@@ -354,8 +415,9 @@ FsRule<E> make_signature_selected(E /*tag*/, std::uint16_t tol, std::uint16_t ho
  * @brief Apply an "all roles == expected" signature.
  *
  * Convenience wrapper over rc::make_signature_all + RcLink::set_failsafe_signature().
+ *
  * @code
- * RC_SET_SIGNATURE_ALL(Flysky, rclink, [expected=0], [tol=3], [hold_ms=250]);
+ * RC_SET_FS_SIGNATURE_ALL(Flysky, rclink, [expected=0], [tol=3], [hold_ms=250]);
  * @endcode
  */
 #define RC_SET_FS_SIGNATURE_ALL(EnumName, LINK, EXPECTED, TOL, HOLD_MS)                                                \
@@ -370,8 +432,9 @@ FsRule<E> make_signature_selected(E /*tag*/, std::uint16_t tol, std::uint16_t ho
  * @brief Apply "default expected + per-role overrides".
  *
  * Convenience wrapper over rc::make_signature_with_overrides + RcLink::set_failsafe_signature().
+ *
  * @code
- * RC_SET_SIGNATURE_OVERRIDES(Flysky, rclink, [default=0], 3, 250,
+ * RC_SET_FS_SIGNATURE_OVERRIDES(Flysky, rclink, [default=0], 3, 250,
  *   { {Flysky::Ch3_LV, 10} }); // throttle 10, others 0
  * @endcode
  */
@@ -388,8 +451,9 @@ FsRule<E> make_signature_selected(E /*tag*/, std::uint16_t tol, std::uint16_t ho
  * @brief Apply "only these roles" (others ignored).
  *
  * Convenience wrapper over rc::make_signature_selected + RcLink::set_failsafe_signature().
+ *
  * @code
- * RC_SET_SIGNATURE_SELECTED(Flysky, rclink, 3, 250,
+ * RC_SET_FS_SIGNATURE_SELECTED(Flysky, rclink, 3, 250,
  *   { {Flysky::Ch1_RH, 0}, {Flysky::Ch2_RV, 0}, {Flysky::Ch3_LV, 0}, {Flysky::Ch4_LH, 0} });
  * @endcode
  */

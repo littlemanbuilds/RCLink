@@ -68,5 +68,8 @@
       ]
     }
   ],
-  "license": "MIT"
+  "license": "MIT",
+  "build": {
+    "includeDir": "src"
+  }
 }

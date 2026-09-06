@@ -24,23 +24,23 @@
 namespace rc
 {
 /**
-     * @brief ESP32 SBUS receiver transport.
-     *
-     * The UART inversion path is intentionally ESP32-specific. The decoder itself
-     * remains hardware-neutral and is host-tested independently.
-     */
+ * @brief ESP32 SBUS receiver transport.
+ *
+ * The UART inversion path is intentionally ESP32-specific. The decoder itself
+ * remains hardware-neutral and is host-tested independently.
+ */
 class RcSbusEsp32Transport
 {
   public:
     /**
-         * @brief Start SBUS on an inverted ESP32 UART.
-         *
-         * @tparam SerialT ESP32 HardwareSerial-compatible type.
-         * @param port Serial object used for receiver input.
-         * @param baud Ignored; SBUS is fixed at 100000 baud.
-         * @param rxPin RX GPIO.
-         * @param txPin Unused for receive-only SBUS.
-         */
+     * @brief Start SBUS on an inverted ESP32 UART.
+     *
+     * @tparam SerialT ESP32 HardwareSerial-compatible type.
+     * @param port Serial object used for receiver input.
+     * @param baud Ignored; SBUS is fixed at 100000 baud.
+     * @param rxPin RX GPIO.
+     * @param txPin Unused for receive-only SBUS.
+     */
     template <typename SerialT> void begin(SerialT &port, std::uint32_t baud, int rxPin, int txPin)
     {
         (void)baud;
@@ -51,11 +51,11 @@ class RcSbusEsp32Transport
     }
 
     /**
-         * @brief Drain available SBUS bytes.
-         *
-         * @param now_ms Timestamp used for parser timeout accounting.
-         * @return True when one or more valid frames were decoded.
-         */
+     * @brief Drain available SBUS bytes.
+     *
+     * @param now_ms Timestamp used for parser timeout accounting.
+     * @return True when one or more valid frames were decoded.
+     */
     bool update(std::uint32_t now_ms)
     {
         bool new_frame = false;
@@ -70,82 +70,131 @@ class RcSbusEsp32Transport
     }
 
     /**
-         * @brief Arduino convenience overload using millis().
-         */
+     * @brief Arduino convenience overload using millis().
+     *
+     * @return True when this poll decodes at least one valid frame.
+     */
     bool update()
     {
         return update(static_cast<std::uint32_t>(millis()));
     }
 
-    /// @brief Return the standard SBUS analogue channel count.
+    /**
+     * @brief Return the standard SBUS analogue channel count.
+     *
+     * @return 16 analogue channels, including before the first frame.
+     */
     int channels() const noexcept
     {
         return decoder_.channels();
     }
 
-    /// @brief Read one decoded SBUS channel in approximate microseconds.
+    /**
+     * @brief Read one decoded SBUS channel in approximate microseconds.
+     *
+     * @param ch Zero-based analogue channel index.
+     * @return Last decoded approximate microseconds; zero before reception or for an invalid index.
+     */
     int readRaw(int ch) const noexcept
     {
         return decoder_.readRaw(ch);
     }
 
-    /// @brief Return the receiver failsafe flag from the last accepted frame.
+    /**
+     * @brief Return the receiver failsafe flag from the last accepted frame.
+     *
+     * @return Last accepted receiver failsafe bit; false after reset.
+     */
     bool protoFailsafe() const noexcept
     {
         return decoder_.protoFailsafe();
     }
 
-    /// @brief Return the frame-lost flag from the last accepted frame.
+    /**
+     * @brief Return the frame-lost flag from the last accepted frame.
+     *
+     * @return Last accepted frame-lost bit; false after reset.
+     */
     bool frameLost() const noexcept
     {
         return decoder_.frameLost();
     }
 
-    /// @brief Return the accepted frame count.
+    /**
+     * @brief Return the accepted frame count.
+     *
+     * @return Accepted-frame counter since reset; wraps modulo 2^32.
+     */
     std::uint32_t frames() const noexcept
     {
         return decoder_.frames();
     }
 
-    /// @brief Return the invalid-footer count exposed as the checksum diagnostic.
+    /**
+     * @brief Return the invalid-footer count exposed as the checksum diagnostic.
+     *
+     * @return Invalid-footer counter since reset; SBUS has no checksum.
+     */
     std::uint32_t crcErrors() const noexcept
     {
         return decoder_.crcErrors();
     }
 
-    /// @brief Return the parser recovery count.
+    /**
+     * @brief Return the parser recovery count.
+     *
+     * @return Parser recovery counter since reset; wraps modulo 2^32.
+     */
     std::uint32_t parseErrors() const noexcept
     {
         return decoder_.parseErrors();
     }
 
-    /// @brief Return the partial-frame timeout count.
+    /**
+     * @brief Return the partial-frame timeout count.
+     *
+     * @return Partial-frame timeout counter since reset; wraps modulo 2^32.
+     */
     std::uint32_t parserTimeouts() const noexcept
     {
         return decoder_.parserTimeouts();
     }
 
-    /// @brief Return bytes discarded during parser recovery.
+    /**
+     * @brief Return bytes discarded during parser recovery.
+     *
+     * @return Recovery-discarded byte counter since reset; wraps modulo 2^32.
+     */
     std::uint32_t discardedBytes() const noexcept
     {
         return decoder_.discardedBytes();
     }
 
-    /// @brief Return validity bits for the analogue channels.
+    /**
+     * @brief Return validity bits for the analogue channels.
+     *
+     * @return 0xFFFF for supported analogue channels; this mask does not prove reception or freshness.
+     */
     std::uint32_t channelValidMask() const noexcept
     {
         return decoder_.channelValidMask();
     }
 
-    /// @brief Return the timestamp of the last accepted frame.
+    /**
+     * @brief Return the timestamp of the last accepted frame.
+     *
+     * @return Last accepted frame timestamp in milliseconds; zero also represents reset.
+     */
     std::uint32_t lastGoodMs() const noexcept
     {
         return decoder_.lastGoodMs();
     }
 
     /**
-         * @brief Describe SBUS transport capabilities.
-         */
+     * @brief Describe SBUS transport capabilities.
+     *
+     * @return Protocol failsafe support enabled; statistics, telemetry and half-duplex disabled.
+     */
     RcTransportCaps caps() const noexcept
     {
         RcTransportCaps c;

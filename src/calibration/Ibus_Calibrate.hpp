@@ -68,35 +68,35 @@ struct Stats
 // ---- Helpers ---- //
 
 /**
-         * @brief Absolute value helper that avoids C++ math headers on small AVR cores.
-         *
-         * @param v Input value.
-         * @return Non-negative absolute value.
-         */
+ * @brief Absolute value helper that avoids C++ math headers on small AVR cores.
+ *
+ * @param v Input value; must not be the minimum representable int.
+ * @return Non-negative absolute value.
+ */
 static inline int abs_i(int v)
 {
     return (v < 0) ? -v : v;
 }
 
 /**
-         * @brief Clamp an integer to a specified range.
-         *
-         * @param v Input value.
-         * @param lo Minimum allowed value.
-         * @param hi Maximum allowed value.
-         * @return Clamped integer value.
-         */
+ * @brief Clamp an integer to a specified range.
+ *
+ * @param v Input value.
+ * @param lo Minimum allowed value.
+ * @param hi Maximum allowed value.
+ * @return Clamped integer value.
+ */
 static inline int clampi(int v, int lo, int hi)
 {
     return v < lo ? lo : (v > hi ? hi : v);
 }
 
 /**
-         * @brief Map a microsecond value into a histogram bin index.
-         *
-         * @param us Input value in microseconds.
-         * @return Histogram bin index (0..kHistBins-1).
-         */
+ * @brief Map a microsecond value into a histogram bin index.
+ *
+ * @param us Input value in microseconds.
+ * @return Histogram bin index (0..kHistBins-1).
+ */
 static inline int bin_index(int us)
 {
     if (us < Stats::kHistMin)
@@ -107,18 +107,18 @@ static inline int bin_index(int us)
 }
 
 /**
-         * @brief Estimate the physical neutral of a continuous axis from dwell density.
-         *
-         * @param s Captured calibration statistics.
-         * @param ch Channel index.
-         * @param rawMin Observed lower endpoint.
-         * @param rawMax Observed upper endpoint.
-         * @return Estimated neutral in microseconds.
-         *
-         * Endpoint bins are excluded where possible so time spent against a stick stop
-         * does not pull neutral away from the actual spring-return position. The
-         * midpoint remains the deterministic fallback when the histogram is sparse.
-         */
+ * @brief Estimate the physical neutral of a continuous axis from dwell density.
+ *
+ * @param s Captured calibration statistics.
+ * @param ch Channel index in [0,Stats::K).
+ * @param rawMin Observed lower endpoint.
+ * @param rawMax Observed upper endpoint.
+ * @return Estimated neutral in microseconds.
+ *
+ * Endpoint bins are excluded where possible so time spent against a stick stop
+ * does not pull neutral away from the actual spring-return position. The
+ * midpoint remains the deterministic fallback when the histogram is sparse.
+ */
 static int estimate_axis_center(const Stats &s, int ch, int rawMin, int rawMax)
 {
     const int midpoint = rawMin + (rawMax - rawMin) / 2;
@@ -162,12 +162,12 @@ enum class ChClass : std::uint8_t
 };
 
 /**
-         * @brief In-place insertion sort for switch level clusters.
-         *
-         * @param lv Array of level values to be sorted (modified in place).
-         * @param oc Array of occupancy counts aligned with lv (modified in place).
-         * @param n Number of elements in both arrays.
-         */
+ * @brief In-place insertion sort for switch level clusters.
+ *
+ * @param lv Array of level values to be sorted (modified in place).
+ * @param oc Array of occupancy counts aligned with lv (modified in place).
+ * @param n Number of elements in both arrays.
+ */
 static void sort_levels(int *lv, std::uint16_t *oc, std::uint8_t n)
 {
     for (int a = 1; a < n; ++a)
@@ -187,14 +187,14 @@ static void sort_levels(int *lv, std::uint16_t *oc, std::uint8_t n)
 }
 
 /**
-         * @brief Heuristic check to classify a channel as an axis using histogram data.
-         *
-         * @param s Statistics container holding histograms and min/max values.
-         * @param ch Channel index to evaluate.
-         * @param spanUs Observed span in microseconds for this channel.
-         * @return true If the channel is likely an axis.
-         * @return false Otherwise (too narrow, too few bins occupied, or low coverage).
-         */
+ * @brief Heuristic check to classify a channel as an axis using histogram data.
+ *
+ * @param s Statistics container holding histograms and min/max values.
+ * @param ch Channel index in [0,Stats::K).
+ * @param spanUs Observed span in microseconds for this channel.
+ * @return true If the channel is likely an axis.
+ * @return false Otherwise (too narrow, too few bins occupied, or low coverage).
+ */
 static bool is_axis_by_hist(const Stats &s, int ch, int spanUs)
 {
     if (spanUs < kSpanNoneUs)
@@ -215,18 +215,26 @@ static bool is_axis_by_hist(const Stats &s, int ch, int spanUs)
 }
 
 /**
-         * @brief Heuristic snap for common 2- or 3-position switch endpoints.
-         *
-         * @param lv Array of detected level values (µs).
-         * @param n Number of levels in lv (must be 2 or 3 to be considered).
-         * @return ChClass::Switch2 if values look like a common 2-position switch.
-         * @return ChClass::Switch3 if values look like a common 3-position switch.
-         * @return ChClass::Axis otherwise.
-         */
+ * @brief Heuristic snap for common 2- or 3-position switch endpoints.
+ *
+ * @param lv Array of detected level values (µs).
+ * @param n Number of levels in lv (must be 2 or 3 to be considered).
+ * @return ChClass::Switch2 if values look like a common 2-position switch.
+ * @return ChClass::Switch3 if values look like a common 3-position switch.
+ * @return ChClass::Axis otherwise.
+ */
 static ChClass snap_2_or_3pos_if_common(const int *lv, std::uint8_t n)
 {
     if (n < 2 || n > 3)
         return ChClass::Axis;
+    /**
+     * @brief Compare bounded calibration values with an inclusive tolerance.
+     *
+     * @param v Raw calibration value in microseconds.
+     * @param target Nominal receiver endpoint in microseconds.
+     * @param tol Nonnegative tolerance in microseconds.
+     * @return True when the absolute difference is within tolerance.
+     */
     const auto near = [](int v, int target, int tol) { return abs_i(v - target) <= tol; };
     constexpr int kTol = 140;
 
@@ -248,17 +256,17 @@ static ChClass snap_2_or_3pos_if_common(const int *lv, std::uint8_t n)
 }
 
 /**
-         * @brief Classify a channel as Axis/Switch based on span, histogram, and clusters.
-         *
-         * @param s Statistics container (histograms, min/max, etc.).
-         * @param ch Channel index to evaluate.
-         * @param spanUs Observed span in microseconds for this channel.
-         * @param levels Pointer to clustered level centers (µs).
-         * @param levelCount Number of clustered levels in levels.
-         * @return ChClass::NoInput if span is too small.
-         * @return ChClass::Axis if histogram density indicates a continuous axis or no switch match.
-         * @return ChClass::Switch2 / ChClass::Switch3 / ChClass::SwitchN for discrete switches.
-         */
+ * @brief Classify a channel as Axis/Switch based on span, histogram, and clusters.
+ *
+ * @param s Statistics container (histograms, min/max, etc.).
+ * @param ch Channel index in [0,Stats::K).
+ * @param spanUs Observed span in microseconds for this channel.
+ * @param levels Pointer to clustered level centers (µs).
+ * @param levelCount Number of clustered levels in levels.
+ * @return ChClass::NoInput if span is too small.
+ * @return ChClass::Axis if histogram density indicates a continuous axis or no switch match.
+ * @return ChClass::Switch2 / ChClass::Switch3 / ChClass::SwitchN for discrete switches.
+ */
 static ChClass classify_channel(const Stats &s, int ch, int spanUs, const int *levels, std::uint8_t levelCount)
 {
     if (spanUs < kSpanNoneUs)
@@ -283,17 +291,22 @@ static ChClass classify_channel(const Stats &s, int ch, int spanUs, const int *l
 }
 
 /**
-         * @brief Interactive iBUS calibrator: prints live data and suggested config/JSON.
-         *
-         * @param uart Hardware serial used for iBUS.
-         * @param rxPin RX pin.
-         * @param txPin TX pin (ignored).
-         * @param baud UART baud rate (e.g., 115200).
-         * @param maxChannels Maximum channels to sample (≤ kIbusMaxChannels).
-         * @param motionThreshUs Delta in µs to treat as motion (for jitter).
-         * @param defaultDeadbandUs Default deadband if jitter-based disabled.
-         * @param useJitterDeadband Whether to derive deadband from observed jitter.
-         */
+ * @brief Interactive iBUS calibrator: prints live data and suggested config/JSON.
+ *
+ * Blocks for serial input to start and stop sampling, then returns after printing.
+ * Suggestions are commissioning aids and require user verification before activation.
+ * Requires the HardwareSerial and Serial.printf interfaces used by this helper;
+ * the core library's portable compile matrix does not validate this optional helper.
+ *
+ * @param uart Hardware serial used for iBUS.
+ * @param rxPin RX pin.
+ * @param txPin TX pin (ignored).
+ * @param baud UART baud rate (e.g., 115200).
+ * @param maxChannels Maximum channels to sample (≤ kIbusMaxChannels).
+ * @param motionThreshUs Delta in µs to treat as motion (for jitter).
+ * @param defaultDeadbandUs Default deadband if jitter-based disabled.
+ * @param useJitterDeadband Whether to derive deadband from observed jitter.
+ */
 inline void run_ibus(::HardwareSerial &uart, int rxPin, int txPin, std::uint32_t baud,
                      std::uint8_t maxChannels = kIbusMaxChannels, int motionThreshUs = 8, int defaultDeadbandUs = 20,
                      bool useJitterDeadband = true)
@@ -343,6 +356,12 @@ inline void run_ibus(::HardwareSerial &uart, int rxPin, int txPin, std::uint32_t
     Serial.println(F("Go!"));
     Serial.println(F("\nLive readings (µs): \n"));
 
+    /**
+     * @brief Accumulate one bounded receiver observation for calibration suggestions.
+     *
+     * @param chIdx Channel index in [0,Stats::K).
+     * @param raw Receiver microseconds; samples outside the sane range are ignored.
+     */
     auto addSample = [&](std::uint8_t chIdx, int raw)
     {
         if (raw < kAxisMinSane || raw > kAxisMaxSane)
