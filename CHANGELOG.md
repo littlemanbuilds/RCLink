@@ -2,7 +2,18 @@
 
 All notable RCLink changes are documented here.
 
-## [Unreleased]
+## [1.3.0] - 2026-09-07
+
+### Fixed
+
+- Accepted frames now cache each mapped, transport-valid receiver channel once, sharing its raw value across aliased roles, validity checks, mapping, signature evaluation and switch learning.
+- The advanced example uses `healthy()` for provider usability, retaining `link_ok` as a freshness diagnostic.
+
+### Added
+
+- Opt-in axis/switch `.valid_raw(lo_us, hi_us)` inclusive plausibility bounds, independent of calibration. Rejected roles fail closed before mapping and cannot update filtering, HoldLast history or learning; configurations without bounds retain existing clamping behaviour.
+- `RcConfigError::InvalidRawValidity` rejects malformed bounds, no-signal overlap and excluded calibration endpoints or explicit switch levels at activation.
+- Native regression coverage for changing transports, shared physical channels, plausibility boundaries, failsafe history, filtering, learning and recovery.
 
 ## [1.2.0] - 2026-08-30
 

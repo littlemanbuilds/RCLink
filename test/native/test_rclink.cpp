@@ -42,6 +42,16 @@ struct FakeTransport {
     void frame(int a, int b=1500, int c=1500) { raw[0]=a; raw[1]=b; raw[2]=c; pending=true; }
 };
 
+// Deliberately unstable reads expose repeated acquisition within a single frame.
+struct ChangingTransport : FakeTransport {
+    mutable int reads[16]{};
+    int readRaw(int ch) const { return reads[ch]++ == 0 ? raw[ch] : 3000; }
+    void frame(int a, int b=1500, int c=1500) {
+        FakeTransport::frame(a,b,c);
+        for (int &n : reads) n=0;
+    }
+};
+
 struct NoCounterTransport {
     int raw[3]{1500, 1500, 1500};
     bool pending{false};
@@ -84,6 +94,100 @@ static std::vector<std::uint8_t> make_sbus(const std::uint16_t ch[16], std::uint
 }
 
 int main() {
+    TEST("one captured physical sample drives aliases, scaling, signature and frame reset");
+    {
+        ChangingTransport t; rc::RcLink<ChangingTransport,Role> l(t); auto c=base_cfg();
+        c.map(Role::B,0); c.axis(Role::A).valid_raw(900,2100).done();
+        CHECK(l.apply_config(c));
+        rc::RcFailsafeRule<3> sig; sig.check[0]=1; sig.expected[0]=20; sig.hold_ms=0;
+        CHECK(l.set_failsafe_signature(sig));
+        t.frame(1600); l.update(1);
+        CHECK(l.read(Role::A)==20); CHECK(l.read(Role::B)==20);
+        CHECK(l.role_valid(Role::A)); CHECK(l.status().rx_failsafe_sig);
+        CHECK(t.reads[0]==1); CHECK(t.reads[1]==0); CHECK(t.reads[2]==1);
+        l.update(2); CHECK(t.reads[0]==1);
+        t.frame(1800); l.update(3); CHECK(l.healthy()); CHECK(l.read(Role::A)==60);
+        CHECK(t.reads[0]==1);
+        t.mask=4; t.frame(1800); l.update(4); CHECK(t.reads[0]==0); CHECK(!l.healthy());
+        t.mask=7; t.frame(0); l.update(5); CHECK(t.reads[0]==1);
+        CHECK(!l.role_valid(Role::A)); CHECK(!l.role_valid(Role::B));
+    }
+
+    TEST("inclusive plausibility rejects extremes, preserves HoldLast and recovers");
+    {
+        FakeTransport t; rc::RcLink<FakeTransport,Role> l(t); auto c=base_cfg();
+        c.axis(Role::A).valid_raw(900,2100).done();
+        c.setFailsafePolicy(Role::A,rc::Failsafe::Mode::HoldLast);
+        c.setFailsafePolicy(Role::B,rc::Failsafe::Mode::Value,17);
+        CHECK(l.apply_config(c));
+        t.frame(900); l.update(1); CHECK(l.healthy()); CHECK(l.read(Role::A)==-100);
+        t.frame(2100); l.update(2); CHECK(l.healthy()); CHECK(l.read(Role::A)==100);
+        t.frame(1700); l.update(3); CHECK(l.read(Role::A)==40);
+        t.frame(899); l.update(4); CHECK(l.ok()); CHECK(!l.healthy());
+        CHECK(!l.role_valid(Role::A)); CHECK(l.read(Role::A)==40); CHECK(l.read(Role::B)==17);
+        t.frame(2101); l.update(5); CHECK(!l.healthy()); CHECK(l.read(Role::A)==40);
+        t.frame(1600); l.update(6); CHECK(l.healthy()); CHECK(l.read(Role::A)==20);
+    }
+
+    TEST("optional alias has independent envelope and rejected samples cannot advance EMA");
+    {
+        FakeTransport t; rc::RcLink<FakeTransport,Role> l(t); auto c=base_cfg();
+        c.map(Role::C,0).optional(Role::C); c.axis(Role::C).valid_raw(900,2100).done();
+        c.setAxisFilter(Role::C,0.5f); c.setFailsafePolicy(Role::C,rc::Failsafe::Mode::HoldLast);
+        CHECK(l.apply_config(c));
+        t.frame(2000); l.update(1); CHECK(l.read(Role::C)==50);
+        t.frame(2101); l.update(2); CHECK(l.healthy()); CHECK(l.read(Role::A)==100);
+        CHECK(!l.role_valid(Role::C)); CHECK(l.read(Role::C)==50);
+        t.frame(899); l.update(3); CHECK(l.healthy()); CHECK(l.read(Role::C)==50);
+        t.frame(1000); l.update(4); CHECK(l.read(Role::C)==-25); CHECK(l.role_valid(Role::C));
+    }
+
+    TEST("switch learning uses captured values and excludes implausible observations");
+    {
+        ChangingTransport t; rc::RcLink<ChangingTransport,Role> l(t); auto c=base_cfg();
+        c.optional(Role::A); c.sw(Role::A).values({0,1,2}).auto_levels().learn_alpha(0.5f)
+            .valid_raw(900,2100).done();
+        CHECK(l.apply_config(c)); CHECK(l.set_switch_learning_enabled(true));
+        t.frame(1100); l.update(1); CHECK(t.reads[0]==1);
+        std::int16_t levels[3]{}; CHECK(l.copy_switch_levels(Role::A,levels,3)==3);
+        CHECK(levels[0]==1050);
+        t.frame(1500); l.update(2);
+        t.frame(2101); l.update(3); CHECK(l.healthy()); CHECK(!l.role_valid(Role::A));
+        t.frame(899); l.update(4); CHECK(!l.role_valid(Role::A));
+        CHECK(l.copy_switch_levels(Role::A,levels,3)==3); CHECK(levels[0]==1050); CHECK(levels[2]==2000);
+        CHECK(!l.finalize_switch_learning());
+        CHECK(l.set_switch_learning_enabled(true));
+        t.frame(900); l.update(5); t.frame(1500); l.update(6); t.frame(2100); l.update(7);
+        CHECK(l.role_valid(Role::A)); CHECK(l.finalize_switch_learning());
+    }
+
+    TEST("activation rejects invalid plausibility ranges and outlying calibration");
+    {
+        const int bounds[][2]={{1000,1000},{2100,900},{rc::kNoSignalThresholdUs,2100},{1001,2100},{900,1999}};
+        for (const auto &b : bounds) {
+            auto c=base_cfg(); c.axis(Role::A).valid_raw(static_cast<std::int16_t>(b[0]),static_cast<std::int16_t>(b[1])).done();
+            FakeTransport t; rc::RcLink<FakeTransport,Role> l(t);
+            CHECK(l.apply_config(c).error==rc::RcConfigError::InvalidRawValidity); CHECK(!l.healthy());
+        }
+        auto c=base_cfg(); c.sw(Role::A).values({0,1}).raw_levels({800,2000}).valid_raw(900,2100).done();
+        CHECK(rc::validate_config(c).error==rc::RcConfigError::InvalidRawValidity);
+        c.sw(Role::A).raw_levels({1000,2200}).done();
+        CHECK(rc::validate_config(c).error==rc::RcConfigError::InvalidRawValidity);
+        c.sw(Role::A).raw_levels({900,2100}).done(); CHECK(rc::validate_config(c));
+        FakeTransport t; rc::RcLink<FakeTransport,Role> l(t); CHECK(l.apply_config(c));
+        t.frame(900); l.update(1); CHECK(l.healthy()); CHECK(l.read(Role::A)==0);
+        t.frame(2100); l.update(2); CHECK(l.healthy()); CHECK(l.read(Role::A)==1);
+        c=base_cfg(); c.sw(Role::A).values({0,1}).valid_raw(1100,2100).done();
+        CHECK(rc::validate_config(c).error==rc::RcConfigError::InvalidRawValidity);
+    }
+
+    TEST("unconfigured plausibility preserves legacy clamping above no-signal threshold");
+    {
+        FakeTransport t; rc::RcLink<FakeTransport,Role> l(t); CHECK(l.apply_config(base_cfg()));
+        t.frame(rc::kNoSignalThresholdUs+1); l.update(1); CHECK(l.healthy()); CHECK(l.read(Role::A)==-100);
+        t.frame(3000); l.update(2); CHECK(l.healthy()); CHECK(l.read(Role::A)==100);
+    }
+
     TEST("accepted-frame sequence deltas use natural uint32 wrap semantics");
     { CHECK(rc::detail::sequence_delta(1u, 0xFFFFFFFFu)==2u); }
 

@@ -14,9 +14,9 @@
 
 // ---- Version ---- //
 
-#define RCLINK_VERSION "1.2.0"
+#define RCLINK_VERSION "1.3.0"
 #define RCLINK_VERSION_MAJOR 1
-#define RCLINK_VERSION_MINOR 2
+#define RCLINK_VERSION_MINOR 3
 #define RCLINK_VERSION_PATCH 0
 
 // ---- Public API ---- //

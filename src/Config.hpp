@@ -185,6 +185,24 @@ template <typename E> struct RcConfig
         }
 
         /**
+         * @brief Enable inclusive raw plausibility limits independently of scaling calibration.
+         *
+         * @param lo Lowest credible receiver value in microseconds; must exceed the no-signal threshold.
+         * @param hi Highest credible receiver value in microseconds; must exceed lo.
+         * @return This builder; activation rejects limits that exclude calibrated endpoints or explicit levels.
+         */
+        AxisB &valid_raw(std::int16_t lo, std::int16_t hi)
+        {
+            if (s)
+            {
+                s->valid_raw_enabled = true;
+                s->valid_raw_lo = lo;
+                s->valid_raw_hi = hi;
+            }
+            return *this;
+        }
+
+        /**
          * @brief Configure calibrated raw endpoints and physical neutral.
          *
          * @param lo Lower receiver value in microseconds.
@@ -365,6 +383,24 @@ template <typename E> struct RcConfig
         SwitchB(RcChannelSpec *spec, RcConfig *parent, std::size_t role_index) noexcept
             : s(spec), cfg(parent), idx(role_index)
         {
+        }
+
+        /**
+         * @brief Enable inclusive raw plausibility limits independently of scaling calibration.
+         *
+         * @param lo Lowest credible receiver value in microseconds; must exceed the no-signal threshold.
+         * @param hi Highest credible receiver value in microseconds; must exceed lo.
+         * @return This builder; activation rejects limits that exclude calibrated endpoints or explicit levels.
+         */
+        SwitchB &valid_raw(std::int16_t lo, std::int16_t hi)
+        {
+            if (s)
+            {
+                s->valid_raw_enabled = true;
+                s->valid_raw_lo = lo;
+                s->valid_raw_hi = hi;
+            }
+            return *this;
         }
 
         /**
@@ -686,6 +722,15 @@ template <typename E> RcConfigResult validate_config(const RcConfig<E> &cfg)
         }
 
         const RcChannelSpec &spec = cfg.specs[i];
+        if (spec.valid_raw_enabled)
+        {
+            if (spec.valid_raw_lo <= kNoSignalThresholdUs || spec.valid_raw_lo >= spec.valid_raw_hi)
+                return RcConfigResult(false, RcConfigError::InvalidRawValidity, i, cfg.role_to_channel[i]);
+            // Explicit switches use their own raw levels; other mappings use axis endpoints.
+            if ((spec.kind == ChannelKind::Axis || spec.sw.raw_count == 0u) &&
+                (spec.axis.raw_lo < spec.valid_raw_lo || spec.axis.raw_hi > spec.valid_raw_hi))
+                return RcConfigResult(false, RcConfigError::InvalidRawValidity, i, cfg.role_to_channel[i]);
+        }
         if (spec.kind == ChannelKind::Axis)
         {
             const RcAxisSpec &axis = spec.axis;
@@ -739,6 +784,9 @@ template <typename E> RcConfigResult validate_config(const RcConfig<E> &cfg)
                     return RcConfigResult(false, RcConfigError::InvalidSwitchLevels, i, cfg.role_to_channel[i]);
                 for (std::uint8_t a = 0u; a < sw.raw_count; ++a)
                 {
+                    if (spec.valid_raw_enabled &&
+                        (sw.raw_levels[a] < spec.valid_raw_lo || sw.raw_levels[a] > spec.valid_raw_hi))
+                        return RcConfigResult(false, RcConfigError::InvalidRawValidity, i, cfg.role_to_channel[i]);
                     if (sw.raw_levels[a] <= kNoSignalThresholdUs)
                         return RcConfigResult(false, RcConfigError::InvalidSwitchLevels, i, cfg.role_to_channel[i]);
                     for (std::uint8_t b = static_cast<std::uint8_t>(a + 1u); b < sw.raw_count; ++b)

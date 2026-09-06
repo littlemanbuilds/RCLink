@@ -8,7 +8,7 @@ RCLink is intentionally **not** a motor controller, safety supervisor, authority
 
 > **What is the receiver currently asking for, and is that receiver data valid enough to use?**
 
-- **Version:** 1.2.0
+- **Version:** 1.3.0
 - **Author:** Little Man Builds
 - **License:** MIT
 
@@ -123,7 +123,7 @@ For a manual install, download the release ZIP and use:
 
 ```ini
 lib_deps =
-    LittleManBuilds/RCLink@^1.2.0
+    LittleManBuilds/RCLink@^1.3.0
 ```
 
 `ArduinoJson` is declared as a package dependency because the optional `Json.hpp` helper uses it.
@@ -254,6 +254,39 @@ if (rclink.healthy())
 
 Call `update()` frequently enough to drain receiver bytes. `healthy()` requires
 fresh, valid required-role evidence with no receiver/protocol failsafe state.
+
+`status().link_ok` and `ok()` report accepted-frame freshness only; a fresh frame
+can still contain unusable roles. Provider health is not permission for the whole
+machine to move.
+
+### Raw calibration and plausibility
+
+Calibration endpoints control scaling, including clamping outside those endpoints.
+Opt-in `valid_raw(lo_us, hi_us)` limits instead decide whether a captured sample is
+credible enough to use, before scaling, filtering or switch learning:
+
+```cpp
+cfg.axis(MyRole::Steering).raw(1000, 2000, 1500).valid_raw(900, 2100).done();
+cfg.sw(MyRole::Mode).raw_levels({1000, 2000}).values({0, 1}).valid_raw(900, 2100).done();
+```
+
+These numbers illustrate the API. Safety/control applications should choose limits
+from measured receiver behaviour with suitable margin, rather than guessing tight
+limits. Bounds are inclusive, must exceed the no-signal threshold, and must contain
+the calibrated axis endpoints or explicit switch levels. Switches without explicit
+levels use the axis endpoints. Invalid configuration returns `InvalidRawValidity`.
+Limits use signed 16-bit microseconds, matching calibration storage.
+
+An out-of-range required role makes `healthy()` false and applies global failsafes;
+an optional role applies its own failsafe without invalidating otherwise healthy
+required roles. Rejected samples cannot update filter history, HoldLast history or
+learning. With no enabled envelope, v1.2 no-signal checks and clamping remain intact.
+Each mapped, transport-valid physical channel is read once per accepted frame;
+aliased roles, scaling, signatures and learning all use that captured value.
+Custom transports must keep the accepted frame stable across different channels;
+this cache does not provide an atomic hardware snapshot of a changing receiver.
+The optional JSON loader does not configure plausibility limits; apply these fluent
+settings to its resulting configuration before activation.
 
 For an individual role:
 
@@ -1104,7 +1137,7 @@ RCLink/
 Current version:
 
 ```text
-1.2.0
+1.3.0
 ```
 
 See [CHANGELOG.md](CHANGELOG.md) for detailed release history.

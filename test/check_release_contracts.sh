@@ -37,7 +37,7 @@ props_ver="$(awk -F= '$1=="version"{print $2}' "$TARGET/library.properties")"
 json_ver="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["version"])' "$TARGET/library.json")"
 header_ver="$(sed -n 's/^#define RCLINK_VERSION "\([^"]*\)"/\1/p' "$TARGET/src/RCLink.h")"
 [[ "$props_ver" == "$json_ver" && "$props_ver" == "$header_ver" ]] || fail "version mismatch"
-[[ "$props_ver" == "1.2.0" ]] || fail "unexpected release version $props_ver"
+[[ "$props_ver" == "1.3.0" ]] || fail "unexpected release version $props_ver"
 grep -Fqx 'license=MIT' "$TARGET/library.properties" || fail "library.properties must declare MIT"
 
 python3 - "$TARGET/library.json" <<'PY'
@@ -143,7 +143,7 @@ if [[ "$STRICT_DISTRIBUTION" -eq 1 ]]; then
 
     if find "$TARGET" -type d \( \
         -name '__MACOSX' -o -name '.pio' -o -name '.vscode' -o -name '.git' -o \
-        -name '.lmb' -o -name '.native-build' -o -name '.test-results' -o -name build \
+        -name '.native-build' -o -name '.test-results' -o -name build \
     \) | grep -q .; then
         fail "distribution contains private/generated directories"
     fi

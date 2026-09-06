@@ -545,6 +545,7 @@ template <class Transport, typename E> class RcLink
             status_.proto_failsafe = tx_.protoFailsafe();
             status_.frame_lost = tx_.frameLost();
 
+            captured_mask_ = 0u;
             bool all_required_valid = true;
             for (std::size_t i = 0u; i < N; ++i)
             {
@@ -564,7 +565,7 @@ template <class Transport, typename E> class RcLink
                 if (!valid || !config_valid_)
                     continue;
 
-                const int raw = tx_.readRaw(static_cast<int>(cfg_.role_to_channel[i]));
+                const int raw = captured_raw_[cfg_.role_to_channel[i]];
                 scaled_.vals[i] = scale_channel_(i, raw);
 
                 const float alpha = cfg_.axis_ema_alpha[i];
@@ -886,9 +887,9 @@ template <class Transport, typename E> class RcLink
      * @brief Determine whether one mapped role has valid source data in the current frame.
      *
      * @param index Logical role index to check; out-of-range indexes are invalid.
-     * @return True for a mapped, present, mask-valid channel above the no-signal threshold; no upper plausibility bound is applied.
+     * @return True for a mapped, present, mask-valid captured sample above the no-signal threshold and inside enabled bounds.
      */
-    bool source_role_valid_(std::size_t index) const noexcept
+    bool source_role_valid_(std::size_t index) noexcept
     {
         if (!config_valid_ || index >= N || cfg_.role_mapped[index] == 0u)
             return false;
@@ -899,8 +900,17 @@ template <class Transport, typename E> class RcLink
         if ((status_.channel_valid_mask & (1u << static_cast<unsigned>(channel))) == 0u)
             return false;
 
-        const int raw = tx_.readRaw(static_cast<int>(channel));
-        return raw > kNoSignalThresholdUs;
+        const std::uint32_t bit = std::uint32_t{1} << channel;
+        // Cache even rejected samples: aliased roles must evaluate the same physical value.
+        if ((captured_mask_ & bit) == 0u)
+        {
+            captured_raw_[channel] = tx_.readRaw(static_cast<int>(channel));
+            captured_mask_ |= bit;
+        }
+        const int raw = captured_raw_[channel];
+        const RcChannelSpec &spec = cfg_.specs[index];
+        return raw > kNoSignalThresholdUs &&
+               (!spec.valid_raw_enabled || (raw >= spec.valid_raw_lo && raw <= spec.valid_raw_hi));
     }
 
     /**
@@ -1168,7 +1178,7 @@ template <class Transport, typename E> class RcLink
             return;
 
         const std::uint8_t channel = cfg_.role_to_channel[index];
-        const int raw = clamp_int_(tx_.readRaw(static_cast<int>(channel)), static_cast<int>(spec.axis.raw_lo),
+        const int raw = clamp_int_(captured_raw_[channel], static_cast<int>(spec.axis.raw_lo),
                                    static_cast<int>(spec.axis.raw_hi));
         const std::uint8_t centroid = static_cast<std::uint8_t>(selected);
         sw_observed_mask_[index] =
@@ -1382,6 +1392,8 @@ template <class Transport, typename E> class RcLink
     RcFrame<N> last_good_{};      ///< Last acceptable application values used by HoldLast.
     RcFrame<N> out_{};            ///< Safe/exposed role values.
     RcFrame<N> last_{};           ///< Previous exposed frame for changed().
+    int captured_raw_[kRcMaxReceiverChannels]{}; ///< Raw physical values captured once per accepted frame.
+    std::uint32_t captured_mask_{0u}; ///< Channels captured in the current accepted frame.
     bool role_source_valid_[N]{}; ///< Per-role validity in the latest accepted transport frame.
     float axis_center_out_[N]{};  ///< Pre-resolved application-space centre outputs.
 

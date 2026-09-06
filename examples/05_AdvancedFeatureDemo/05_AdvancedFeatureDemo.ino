@@ -178,7 +178,7 @@ void loop()
     // Show the *applied* outputs, but only when they change OR a failsafe is active.
     static bool printedFailsafe = false;
 
-    if (!st.link_ok || st.proto_failsafe || st.rx_failsafe_sig)
+    if (!rclink.healthy())
     {
         if (!printedFailsafe)
         {
@@ -186,6 +186,8 @@ void loop()
                 Serial.println(F("Failsafe: link lost/protocol failsafe."));
             else if (st.rx_failsafe_sig)
                 Serial.println(F("Failsafe: receiver signature detected."));
+            else
+                Serial.println(F("Provider unavailable: configuration, required role or frame-lost fault."));
 
             RC_PRINT_ALL(rclink, Flysky); // Show applied outputs once.
             printedFailsafe = true;       // Do not print again until the state clears.

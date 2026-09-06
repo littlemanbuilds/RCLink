@@ -83,6 +83,9 @@ struct RcChannelSpec
     ChannelKind kind{ChannelKind::Axis}; ///< Active specification type.
     RcAxisSpec axis{};                   ///< Axis specification.
     RcSwitchSpec sw{};                   ///< Switch specification.
+    bool valid_raw_enabled{false};       ///< Opt-in source plausibility check before mapping.
+    std::int16_t valid_raw_lo{0};         ///< Inclusive credible lower bound in microseconds.
+    std::int16_t valid_raw_hi{0};         ///< Inclusive credible upper bound in microseconds.
 
     /**
      * @brief Build an axis channel specification.
@@ -152,7 +155,8 @@ enum class RcConfigError : std::uint8_t
     InvalidSwitchCount,
     InvalidSwitchLevels,
     InvalidSwitchSeparation,
-    InvalidSwitchLearning
+    InvalidSwitchLearning,
+    InvalidRawValidity
 };
 
 /**

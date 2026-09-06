@@ -10,10 +10,7 @@ The native suite covers asymmetric axis centres, one-sided inversion rejection/r
 
 ## Target compile matrix
 
-GitHub Actions uses PlatformIO to compile `test/portable_compile/portable_compile.ino` across ESP32-S3, classic ESP32, ESP8266, RP2040, SAMD, SAM/Due, Teensy 4.1, and STM32. AVR and MegaAVR are not v1.2 targets. The public ESP32-S3 examples are compiled separately because they intentionally use `Serial2` and ESP32-oriented wiring.
+GitHub Actions uses PlatformIO to compile `test/portable_compile/portable_compile.ino` across ESP32-S3, ESP8266, RP2040, SAMD, SAM/Due, Teensy 4.1, and STM32. AVR and MegaAVR are not supported targets. The public ESP32-S3 examples are compiled separately because they intentionally use `Serial2` and ESP32-oriented wiring.
 
 Native tests validate logic. Target compiles validate toolchain/API compatibility. Physical receiver tests are still required before a release is considered hardware-validated.
 
-## LMB presentation conformance
-
-LMB presentation rules are checked by the installed fleet conformance harness rather than duplicated in this repository. Repository tests remain focused on library-specific behaviour, compatibility, release metadata, and examples.
