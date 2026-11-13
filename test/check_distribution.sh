@@ -33,4 +33,21 @@ tar -C "$ROOT" \
     -cf - "${items[@]}" | tar -C "$STAGE" -xf -
 
 bash "$ROOT/test/check_release_contracts.sh" --distribution "$STAGE"
+# Negative probes belong only to this disposable stage, never the user's tree.
+for member in src/AGENTS.md src/credentials.json src/.env src/leaked.o; do
+    touch "$STAGE/$member"
+    if bash "$ROOT/test/check_release_contracts.sh" --distribution "$STAGE" >/dev/null 2>&1; then
+        echo "distribution-contract: failed to reject $member" >&2
+        exit 1
+    fi
+    rm "$STAGE/$member"
+done
+for member in .lmb .codex .git .aws .pio; do
+    mkdir "$STAGE/src/$member"
+    if bash "$ROOT/test/check_release_contracts.sh" --distribution "$STAGE" >/dev/null 2>&1; then
+        echo "distribution-contract: failed to reject $member" >&2
+        exit 1
+    fi
+    rmdir "$STAGE/src/$member"
+done
 echo "distribution-contract: PASS"

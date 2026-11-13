@@ -478,7 +478,7 @@ template <typename E> struct RcConfig
         }
 
         /**
-         * @brief Configure switch snap hysteresis.
+         * @brief Configure the total band around adjacent learned switch midpoints.
          *
          * @param us Total hysteresis band in microseconds.
          * @return This builder.

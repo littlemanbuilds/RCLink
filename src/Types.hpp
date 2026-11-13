@@ -70,7 +70,7 @@ struct RcSwitchSpec
     std::int16_t raw_levels[kRcMaxSwitchVals]{}; ///< Explicit raw snap levels in microseconds.
 
     bool auto_levels{false};       ///< Allow commissioning-time centroid learning when explicitly enabled by RcLink.
-    std::uint16_t hyst_us{60};     ///< Hysteresis band used while snapping learned centroids.
+    std::uint16_t hyst_us{60};     ///< Total band around adjacent learned midpoints; explicit levels remain nearest-only.
     float learn_alpha{0.20f};      ///< Commissioning-time centroid EMA factor in the range (0,1].
     std::uint16_t min_sep_us{120}; ///< Minimum accepted spacing between switch centroids.
 };
@@ -254,8 +254,8 @@ struct RcLinkStatus
 
     std::uint8_t channel_count{0};       ///< Channels available in the most recent accepted transport frame.
     std::uint32_t channel_valid_mask{0}; ///< Per-channel validity bits for channels 0..31.
-    std::uint32_t frame_sequence{0};     ///< RCLink-owned accepted-frame sequence; wraps naturally at uint32_t max.
-    std::uint16_t fps{0};                ///< Estimated accepted frames per second.
+    std::uint32_t frame_sequence{0};     ///< RCLink lifetime count of update batches with decoded data; wraps at uint32_t max.
+    std::uint16_t fps{0};                ///< Estimated decoded update batches per second, independent of transport diagnostics.
     std::uint32_t frames{0};             ///< Optional transport-reported frame diagnostic; zero when unavailable.
     std::uint32_t crc_errors{0};         ///< Checksum/footer failures reported by the transport.
     std::uint32_t parse_errors{0};       ///< Framing/format errors reported by the transport.

@@ -8,9 +8,10 @@ RCLink is intentionally **not** a motor controller, safety supervisor, authority
 
 > **What is the receiver currently asking for, and is that receiver data valid enough to use?**
 
-- **Version:** 1.3.0
+- **Version:** 1.3.1
 - **Author:** Little Man Builds
 - **License:** MIT
+- **Qualification:** software-qualified with focused ESP32-S3 iBUS and configured receiver-signature tests. General RF-loss detection, SBUS hardware and vehicle safety remain unqualified. See [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md).
 
 ---
 
@@ -29,17 +30,18 @@ RCLink is intentionally **not** a motor controller, safety supervisor, authority
 - [Validity and health model](#validity-and-health-model)
 - [Failsafe behaviour](#failsafe-behaviour)
 - [Receiver-failsafe signatures](#receiver-failsafe-signatures)
+- [Physical Receiver Setup and Failsafe Configuration](#physical-receiver-setup-and-failsafe-configuration)
 - [Commissioning switch learning](#commissioning-switch-learning)
 - [Transports and parser resilience](#transports-and-parser-resilience)
 - [JSON configuration](#json-configuration)
 - [iBUS calibration helper](#ibus-calibration-helper)
 - [Examples](#examples)
-- [Testing](#testing)
-- [Public API guide](#public-api-guide)
+- [Testing and validation](#testing-and-validation)
+- [API reference](#api-reference)
 - [Migration from v1.1](#migration-from-v11)
 - [Project integration guidance](#project-integration-guidance)
 - [Repository structure](#repository-structure)
-- [Limitations](#limitations)
+- [Deliberate limitations](#deliberate-limitations)
 - [License](#license)
 
 ---
@@ -109,24 +111,37 @@ That boundary keeps RCLink reusable. A car, robot, boat, camera rig, accessibili
 
 ### Arduino IDE
 
-When installed from the Arduino Library Manager, include:
+Include the public umbrella header after installing the library:
 
 ```cpp
 #include <RCLink.h>
 ```
 
-For a manual install, download the release ZIP and use:
+For a manual 1.3.1 install, use the curated source ZIP from the
+[GitHub release](https://github.com/littlemanbuilds/RCLink/releases) once published:
 
 **Sketch → Include Library → Add .ZIP Library…**
+
+For a ZIP installation, install ArduinoJson 7.x separately through Library Manager;
+7.4.3 is the tested dependency. Include `RCLink.h` from your sketch.
 
 ### PlatformIO
 
 ```ini
 lib_deps =
-    LittleManBuilds/RCLink@^1.3.0
+    https://github.com/littlemanbuilds/RCLink.git#v1.3.1
 ```
 
-`ArduinoJson` is declared as a package dependency because the optional `Json.hpp` helper uses it.
+The prospective `v1.3.1` tag must be published before this pinned Git URL resolves.
+RCLink is registered in [Arduino Library Manager](https://www.arduino.cc/reference/en/libraries/rclink/)
+and [PlatformIO Registry](https://registry.platformio.org/libraries/littlemanbuilds/RCLink).
+As checked on 2026-11-13, both list 1.2.0 as their latest version. Do not assume
+1.3.1 is available from either registry until its listing is confirmed after release.
+
+`ArduinoJson` is declared as a dependency; PlatformIO specifies `^7.4.2`, and 7.4.3
+was used for qualification. Upgrade to the published 1.3.1 source/tag, rebuild your
+application, and recheck its mapping, calibration and failsafe policy on the intended
+receiver before enabling actuation.
 
 ---
 
@@ -137,7 +152,7 @@ supplied feature set: the Stream-based iBUS transport, hardware-neutral iBUS
 and SBUS decoders, and the ESP32 inverted-UART SBUS transport.
 
 The hardware-neutral core, decoders, and Stream-based iBUS path are also
-compile-validated on this selected portable set:
+supported on this selected portable set; see RELEASE_CHECKLIST.md for current candidate evidence:
 
 - ESP8266;
 - RP2040;
@@ -291,7 +306,7 @@ settings to its resulting configuration before activation.
 For an individual role:
 
 ```cpp
-if (rclink.role_valid(MyRole::Steering))
+if (rclink.healthy() && rclink.role_valid(MyRole::Steering))
 {
     const int16_t value = rclink.read(MyRole::Steering);
     // value is fresh and valid for this role
@@ -557,8 +572,13 @@ The latest accepted frame satisfied the current required-role mapping.
 ### `frame_sequence`
 
 RCLink increments this application-facing sequence once whenever it accepts
-new receiver-frame evidence. It is independent of optional transport
-diagnostic counters and wraps naturally from `UINT32_MAX` to zero. Consumers
+new receiver-frame evidence from one successful transport `update()` batch.
+One poll may drain multiple wire frames and exposes only its latest decoded values;
+that poll increments the sequence once. `fps` counts these decoded update batches,
+including batches later rejected by application validity/failsafe rules. Exact
+wire-frame counts, where available, remain in `status().frames`.
+The sequence spans configuration reapplication and `begin()`, is independent of optional
+transport diagnostic counters and wraps naturally from `UINT32_MAX` to zero. Consumers
 should compare sequence deltas with unsigned arithmetic.
 
 ### `healthy`
@@ -584,7 +604,7 @@ if (rclink.healthy())
 ### Per-role validity
 
 ```cpp
-if (rclink.role_valid(MyRole::Steering))
+if (rclink.healthy() && rclink.role_valid(MyRole::Steering))
 {
     ...
 }
@@ -593,7 +613,7 @@ if (rclink.role_valid(MyRole::Steering))
 or:
 
 ```cpp
-if (rclink.role_valid(MyRole::Steering))
+if (rclink.healthy() && rclink.role_valid(MyRole::Steering))
 {
     const int16_t steering = rclink.read(MyRole::Steering);
     ...
@@ -603,6 +623,18 @@ if (rclink.role_valid(MyRole::Steering))
 ### Bounds-safe reads
 
 The normal `read()` and `read_by_index()` paths are bounds checked. An invalid role/index fails closed rather than indexing arbitrary memory.
+
+`role_valid()` can remain true during protocol failsafe: it reports source presence
+and freshness, while `healthy()` reports provider usability. For motion or authority
+selection, check both provider health and the particular role's validity, then apply
+the application's own safety/authority rules. HoldLast retains a value; it does not
+authorize motion.
+
+`begin()` clears frame validity, accepted output/filter history, and runtime switch
+learning state while preserving caller configuration and signature settings. A new
+frame is required for health after restart. `status().frames` and parser counters
+mirror the transport's current lifetime since its last reset, including zero.
+`apply_config()` does not restart the transport; it refreshes those diagnostics.
 
 Use `role_valid()` when you need source freshness/validity. `try_read()` only distinguishes a valid role index from an invalid one while copying the current safe output.
 
@@ -647,13 +679,13 @@ An optional missing role receives only its own failsafe output while valid requi
 
 Some receivers continue transmitting valid protocol frames during receiver failsafe but force selected channels to known values. RCLink can detect that pattern in scaled application space.
 
-Example:
+For measured safe values of zero (which can also occur during normal operation):
 
 ```cpp
 RC_SET_FS_SIGNATURE_SELECTED(MyRole, rclink,
     /* tolerance */ 2,
     /* hold ms   */ 50,
-    {{MyRole::Steering, 100},
+    {{MyRole::Steering,   0},
      {MyRole::Throttle,   0}});
 ```
 
@@ -679,6 +711,76 @@ rc::RcFailsafeRule<static_cast<size_t>(MyRole::Count)> rule;
 ...
 const rc::RcSignatureResult result = rclink.set_failsafe_signature(rule);
 ```
+
+---
+
+## Physical Receiver Setup and Failsafe Configuration
+
+Supply the receiver within its specified range, use a common receiver/MCU ground,
+and connect its data output to the correct MCU UART RX. The ESP32-S3 examples use
+GPIO18 at 115200 baud, RX only. Check pin conflicts and **signal voltage separately
+from receiver supply voltage**; use suitable level conversion for a 3.3 V MCU if
+needed. Verify the interface before connecting it, power off before rewiring, and
+commission with motion-producing equipment disconnected.
+
+RF loss between transmitter and receiver differs from receiver-to-MCU UART loss.
+RCLink detects stale communication, but a receiver may keep sending fresh iBUS
+frames containing held or deliberately programmed failsafe positions after RF loss.
+iBUS has no RF-loss flag. In the [FS-i6X manual](https://www.flysky-eu.com/en/transmitter/fs-i6x/manual),
+failsafe **OFF** retains the channel's last position; an enabled setting selects a
+programmed position. OFF does not mean zero or disabled output. Verify the actual
+receiver arrangement, saved settings and received values.
+
+Prefer receiver-programmed safe motion values to held or extreme commands. Measure
+neutral and zero-drive positions in the consuming application's calibration and
+mapping; transmitter percentage labels are not RCLink scaled values. A dedicated
+auxiliary disarm control can provide an additional gate. Its selected values must
+be distinguishable within the signature's inclusive, global tolerance: tolerance 2
+matches both 0 and 1, whereas values 0/100 remain distinct.
+
+For example, reuse the earlier `MyRole` mapping, with measured safe steering and
+throttle values of zero. Here `Mode` serves as a dedicated DISARMED/ARMED input,
+using the example's measured raw switch levels; adapt all calibration to the actual
+installation. Configure explicit safe outputs and check both setup results:
+
+```cpp
+cfg.sw(MyRole::Mode).raw_levels({1000, 2000}).values({0, 100}).done();
+cfg.setFailsafePolicy(MyRole::Steering, rc::Failsafe::Mode::Value, 0);
+cfg.setFailsafePolicy(MyRole::Throttle, rc::Failsafe::Mode::Value, 0);
+cfg.setFailsafePolicy(MyRole::Mode, rc::Failsafe::Mode::Value, 0);
+const auto signature = rc::make_signature_selected(
+    MyRole{}, /* tolerance */ 2, /* hold ms */ 250,
+    {{MyRole::Steering, 0}, {MyRole::Throttle, 0}, {MyRole::Mode, 0}});
+const bool receiverConfigured =
+    static_cast<bool>(rclink.apply_config(cfg)) &&
+    static_cast<bool>(rclink.set_failsafe_signature(signature));
+rclink.apply_rxfs_outputs(true);
+```
+
+Keep application actuation inhibited if `receiverConfigured` is false. Signature
+matching uses selected **unfiltered scaled application values**. New valid matching
+updates must span the configured hold; confirmation sets `status().rx_failsafe_sig`
+and makes `healthy()` false. The output policy is separate:
+
+- `apply_rxfs_outputs(false)` is intentionally status-only: it reports confirmation
+  without substituting the configured failsafe outputs for those received values.
+- `apply_rxfs_outputs(true)` applies configured failsafe outputs after confirmation.
+
+Neither mode guarantees suppression during confirmation: ordinary receiver values
+can remain exposed and health can remain true. When enforcement is enabled, matching
+candidates are excluded from accepted HoldLast/filter history. A new nonmatching
+valid update clears signature detection and permits normal receiver processing to
+resume. Neither matching nor recovery proves RF presence: legitimate live controls
+can produce the same pattern, including the example's neutral/disarmed combination.
+
+RCLink owns decoding, validation, calibration/shaping, freshness, signature matching,
+configured fallback and diagnostics. The application owns authority, fault latching,
+deliberate rearming, actuator enable and emergency behavior. **Health alone is not
+motion authorization.** Gate hazardous actions on required-role validity, disarm and
+application authority as well as health; apply safe behavior on stale or confirmed
+faults. Recovery must not automatically rearm. Test actual receiver behavior and
+confirmation latency: software signatures alone cannot guarantee immediate RF-loss
+response or end-to-end stopping. See the measured integration scope below.
 
 ---
 
@@ -959,10 +1061,11 @@ Runs AddressSanitizer and UndefinedBehaviorSanitizer over the deterministic suit
 
 ### Cross-platform compile matrix
 
-GitHub Actions is configured to compile the selected portable API across the
-target list described earlier, including both SAMD and SAM boards. It also
-compiles all public ESP32-S3 examples separately. The presence of this workflow
-does not itself prove that remote CI has run.
+The selected portable API and all five ESP32-S3 examples passed the
+[13-job GitHub Actions run](https://github.com/littlemanbuilds/RCLink/actions/runs/43492344319)
+on the reviewed pre-amendment candidate, including both SAMD and SAM boards.
+The final amended release commit still requires its own successful CI run; see
+[RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md).
 
 ### Hardware tests still matter
 
@@ -974,7 +1077,26 @@ Host tests cannot prove:
 - EMI/noise behaviour in the final installation;
 - end-to-end application stopping behaviour.
 
-Those remain release/hardware gates in `RELEASE_CHECKLIST.md`.
+A focused ESP32-S3 test with an FS-i6X transmitter and FS-iA6B receiver verified
+live iBUS acquisition, stick mapping, stable neutral, explicit switch transitions,
+missing-frame failsafe and recovery. With a 200 ms timeout, receiver power loss
+invalidated controls at frame age 201 ms. Signal-disconnected startup denied controls
+until fresh frames arrived after reconnection.
+
+The receiver was deliberately programmed to transmit its failsafe positions after
+transmitter-off, including full-scale steering and throttle values. This is expected
+receiver behavior, not an RCLink defect. Without a configured signature, RCLink remained healthy;
+communication timeout alone does not detect this receiver's RF loss. A subsequent
+four-channel signature test with enforcement enabled confirmed the programmed
+pattern after 264 ms for a 250 ms hold and then applied zero outputs; full-scale
+commands remained exposed before confirmation. Recovery cleared the signature on
+the first nonmatching update. A temporary safer-preset trial confirmed after 255 ms
+with the same 250 ms hold; motion values were already zero and its diagnostic
+application disarmed before confirmation. Both signature timings include fixture
+overhead and exclude the receiver's internal RF-loss reaction time. Recovery succeeded;
+the diagnostic latch required a separate rearm. Physical SBUS, general RF-loss detection and
+installation safety remain unqualified. See
+[RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md) for the observed scope and deferred checks.
 
 ---
 
@@ -1132,12 +1254,36 @@ RCLink/
 
 ---
 
+### Switch matching and hysteresis
+
+Explicit `raw_levels()` match the valid receiver sample before endpoint clamping.
+Levels outside default 1000–2000 µs endpoints remain reachable; `valid_raw()` still
+rejects samples outside its configured inclusive bounds, and no-signal rules still
+apply. Explicit levels and ordinary evenly spaced switches retain nearest-level
+selection without hysteresis.
+
+For `auto_levels()` switches, `hysteresis_us(h)` is the total band centred on each
+adjacent centroid midpoint. Moving upward requires passing midpoint + h/2; moving
+downward requires passing midpoint − h/2. Equality retains the accepted position;
+the initial sample selects the nearest centroid. Only acceptable frames commit
+selection and commissioning observations. Unequal learned spacing uses each actual
+adjacent midpoint. Persisted explicit levels retain the nearest-only contract.
+
+JSON loading rejects strings, null, booleans and fractional channel indices rather
+than coercing them. Known fields require their documented types; unknown roles and
+absent fields are ignored. Failure leaves the supplied config unchanged. Always
+validate with `apply_config()` before use.
+
+Calibration records one observation per newly decoded update batch, never repeated
+polls of cached values. Batched wire packets contribute only the latest values.
+Histogram and dwell counters saturate instead of wrapping.
+
 ## Version history
 
 Current version:
 
 ```text
-1.3.0
+1.3.1
 ```
 
 See [CHANGELOG.md](CHANGELOG.md) for detailed release history.

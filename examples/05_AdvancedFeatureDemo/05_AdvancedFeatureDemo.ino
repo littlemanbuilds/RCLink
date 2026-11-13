@@ -113,8 +113,11 @@ void setup()
     cfg.setFailsafePolicy(Flysky::Ch9_SwC, Failsafe::Mode::Value, 0);
     cfg.setFailsafePolicy(Flysky::Ch10_SwD, Failsafe::Mode::Value, 0);
 
-    // Sets the receiver-failsafe signature (when the receiver keeps sending frames but in a
-    // known pattern). This DOESN'T apply the output policy automatically.
+    // A distinctive pattern can recognize programmed receiver failsafe values even
+    // while fresh frames continue. Matching ordinary control positions is not proof
+    // of RF loss: a live transmitter can produce the same combination.
+    // This pattern is a diagnostic demonstration, not a recommendation to program
+    // motion channels to extreme values. Prefer independently safe receiver presets.
     const FsRule<Flysky> rx_failsafe_signature = make_signature_selected(
         Flysky{}, /* tol */ 2, /* hold_ms */ 250,
         {{Flysky::Ch1_RH, 100}, {Flysky::Ch2_RV, 100}, {Flysky::Ch3_LV, 100}, {Flysky::Ch4_LH, -100}});
@@ -122,9 +125,11 @@ void setup()
     if (!signature_result)
         Serial.println(F("Receiver failsafe signature was rejected."));
 
-    // Control how receiver-failsafe signatures affect outputs. If enabled, outputs switch
-    // to the configured failsafe policy, when a signature is detected. If disabled,
-    // status().rx_failsafe_sig still reports the match, but outputs continue to follow live frames.
+    // Intentionally status-only: confirmation sets rx_failsafe_sig and makes healthy()
+    // false, but does not replace received values with the configured safe outputs.
+    // Change false to true to enforce those outputs AFTER signature confirmation.
+    // Neither mode guarantees suppression during the 250 ms matching hold.
+    // Measure actual receiver behavior and polling latency before application use.
     rclink.apply_rxfs_outputs(false);
 
     const RcConfigResult config_result = rclink.apply_config(cfg);
@@ -206,7 +211,11 @@ void loop()
     }
 
     // Example: use individual roles directly (here throttle as 0..100).
-    const int throttle = rclink.read(Flysky::Ch3_LV);
+    // Health, HoldLast or a valid channel alone does not authorize movement.
+    // Authority, actuator enable, fault latching and deliberate rearming belong
+    // to the consuming application; this example only observes receiver data.
+    const bool receiverReady = rclink.healthy() && rclink.role_valid(Flysky::Ch3_LV);
+    const int throttle = receiverReady ? rclink.read(Flysky::Ch3_LV) : 0;
     (void)throttle; // Replace with your application logic.
 
     delay(10); // About 100 Hz loop rate.

@@ -34,20 +34,18 @@ for file in \
 done
 
 props_ver="$(awk -F= '$1=="version"{print $2}' "$TARGET/library.properties")"
-json_ver="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["version"])' "$TARGET/library.json")"
+json_ver="$(python3 -B -c 'import json,sys; print(json.load(open(sys.argv[1]))["version"])' "$TARGET/library.json")"
 header_ver="$(sed -n 's/^#define RCLINK_VERSION "\([^"]*\)"/\1/p' "$TARGET/src/RCLink.h")"
 [[ "$props_ver" == "$json_ver" && "$props_ver" == "$header_ver" ]] || fail "version mismatch"
-[[ "$props_ver" == "1.3.0" ]] || fail "unexpected release version $props_ver"
+[[ "$props_ver" == "1.3.1" ]] || fail "unexpected release version $props_ver"
 grep -Fqx 'license=MIT' "$TARGET/library.properties" || fail "library.properties must declare MIT"
 
-python3 - "$TARGET/library.json" <<'PY'
-import json
+python3 -B -c 'import json
 import sys
 
 metadata = json.load(open(sys.argv[1]))
 if metadata.get("license") != "MIT":
-    raise SystemExit("release-contract: library.json must declare MIT")
-PY
+    raise SystemExit("release-contract: library.json must declare MIT")' "$TARGET/library.json"
 
 for header in \
     src/RCLink.h \
@@ -76,8 +74,7 @@ for heading in \
     grep -Fq "$heading" "$TARGET/README.md" || fail "README missing $heading"
 done
 
-python3 - "$TARGET/library.json" "$TARGET" <<'PY'
-import json
+python3 -B -c 'import json
 import pathlib
 import sys
 
@@ -88,8 +85,7 @@ if len(examples) != 5:
     raise SystemExit(f"release-contract: expected 5 examples, found {len(examples)}")
 missing = [example for example in examples if not (root / example).is_file()]
 if missing:
-    raise SystemExit("release-contract: missing metadata example: " + ", ".join(missing))
-PY
+    raise SystemExit("release-contract: missing metadata example: " + ", ".join(missing))' "$TARGET/library.json" "$TARGET"
 
 # Established safety/health contracts that must remain represented in the public headers.
 grep -Fq 'kInvalidChannel' "$TARGET/src/Constants.hpp" || fail "invalid-channel sentinel missing"
@@ -103,12 +99,10 @@ grep -Fq 'set_switch_learning_enabled' "$TARGET/src/Link.hpp" || fail "switch-le
 # RCLink deliberately supports representative non-ESP32 targets. The routine local ESP32 target is S3 only.
 ! grep -Eq '^[[:space:]]*(src_dir|lib_extra_dirs)[[:space:]]*=' "$TARGET/platformio.ini" ||
     fail "library validation must not redirect project sources or use lib_extra_dirs"
-python3 - "$TARGET/library.json" <<'PYJSON'
-import json
+python3 -B -c 'import json
 import sys
 if json.load(open(sys.argv[1])).get("build", {}).get("includeDir") != "src":
-    raise SystemExit("release-contract: build.includeDir must be src")
-PYJSON
+    raise SystemExit("release-contract: build.includeDir must be src")' "$TARGET/library.json"
 grep -Fq '[env:esp32-s3-devkitc-1]' "$TARGET/platformio.ini" ||
     fail "ESP32-S3 reference environment missing"
 ! grep -Fq '[env:esp32dev]' "$TARGET/platformio.ini" ||
@@ -134,9 +128,17 @@ if grep -Eq '^[[:space:]]*test/?[[:space:]]*$' "$TARGET/.gitignore"; then
 fi
 
 if [[ "$STRICT_DISTRIBUTION" -eq 1 ]]; then
+    python3 -B -c 'import pathlib,sys
+root=pathlib.Path(sys.argv[1])
+private={".git", ".lmb", ".codex", ".agents", ".aws", ".ssh", ".dependencies", "__MACOSX", ".pio", ".vscode", ".idea"}
+names={"AGENTS.md", "credentials", "credentials.json", ".env", "id_rsa", "id_ed25519"}
+for p in root.rglob("*"):
+    if p.is_symlink() or p.name in private or p.name in names or p.name.startswith(".env."):
+        raise SystemExit("release-contract: private or linked distribution member: "+str(p.relative_to(root)))' "$TARGET"
     if find "$TARGET" -type f \( \
         -name '.DS_Store' -o -name '._*' -o -name '*.zip' -o -name '*.o' -o \
-        -name '*.obj' -o -name '*.elf' -o -name '*.bin' -o -name '*.log' \
+        -name '*.obj' -o -name '*.elf' -o -name '*.bin' -o -name '*.log' -o \
+        -name '*.a' -o -name '*.hex' -o -name '*.out' -o -name '*.pyc' -o -name '*.pem' -o -name '*.key' \
     \) | grep -q .; then
         fail "distribution contains generated, OS, archive, or build files"
     fi

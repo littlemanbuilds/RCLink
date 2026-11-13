@@ -110,10 +110,11 @@ template <typename E> inline bool role_from_name(const char *name, E &out)
  * @endcode
  *
  * @tparam E Role enum declared before this header.
- * @param cfg Configuration to modify in place; earlier changes remain on failure.
+ * @param cfg Configuration updated atomically on successful type/range validation.
  * @param json Null-terminated JSON text; nullptr is rejected.
  * @return False on parse or checked range errors; true does not imply configuration validity.
- * @note Unknown roles and absent fields are ignored. Validate with apply_config() before use.
+ * @note Unknown roles and absent fields are ignored. Present known fields require schema types.
+ * Validate with apply_config() before use; loading does not activate controls.
  */
 template <typename E> bool load_json(E /*tag*/, RcConfig<E> &cfg, const char *json)
 {
@@ -127,6 +128,15 @@ template <typename E> bool load_json(E /*tag*/, RcConfig<E> &cfg, const char *js
     if (err)
         return false;
 
+    if (!doc.is<JsonObject>())
+        return false;
+    // Validate types before ArduinoJson can coerce strings, bools or null to controls.
+    for (const char *section : {"map", "axes", "switches"})
+        if (!doc[section].isUnbound() && !doc[section].is<JsonObject>())
+            return false;
+
+    RcConfig<E> next = cfg;
+
     // ---- Map ---- //
 
     if (doc["map"].is<JsonObject>())
@@ -135,13 +145,16 @@ template <typename E> bool load_json(E /*tag*/, RcConfig<E> &cfg, const char *js
         for (JsonPair kvp : map)
         {
             const char *roleName = kvp.key().c_str();
+            E role{};
+            if (!role_from_name(roleName, role))
+                continue;
+            if (!kvp.value().is<int>())
+                return false;
             const int ch = kvp.value().as<int>();
             if (ch < 0 || ch >= static_cast<int>(kRcMaxReceiverChannels))
                 return false;
 
-            E role{};
-            if (role_from_name(roleName, role))
-                cfg.map(role, static_cast<std::uint8_t>(ch));
+            next.map(role, static_cast<std::uint8_t>(ch));
         }
     }
 
@@ -157,12 +170,29 @@ template <typename E> bool load_json(E /*tag*/, RcConfig<E> &cfg, const char *js
             if (!role_from_name(roleName, role))
                 continue;
 
-            auto b = cfg.axis(role);
+            if (!kvp.value().is<JsonObject>())
+                return false;
+            auto b = next.axis(role);
             JsonObject a = kvp.value().as<JsonObject>();
+
+            for (const char *field : {"raw", "out"})
+                if (!a[field].isUnbound() && !a[field].is<JsonArray>())
+                    return false;
+            for (const char *field : {"center_out", "expo"})
+                if (!a[field].isUnbound() && !a[field].is<float>())
+                    return false;
+            if ((!a["deadband_us"].isUnbound() && !a["deadband_us"].is<int>()) ||
+                (!a["invert"].isUnbound() && !a["invert"].is<bool>()))
+                return false;
 
             if (a["raw"].is<JsonArray>())
             {
                 JsonArray ra = a["raw"].as<JsonArray>();
+                if (ra.size() < 2 || ra.size() > 3)
+                    return false;
+                for (JsonVariant value : ra)
+                    if (!value.is<std::int16_t>())
+                        return false;
                 if (ra.size() >= 2)
                 {
                     const int lo = ra[0].as<int>();
@@ -187,8 +217,9 @@ template <typename E> bool load_json(E /*tag*/, RcConfig<E> &cfg, const char *js
             if (a["out"].is<JsonArray>())
             {
                 JsonArray out = a["out"].as<JsonArray>();
-                if (out.size() >= 2)
-                    b.out(out[0].as<float>(), out[1].as<float>());
+                if (out.size() != 2 || !out[0].is<float>() || !out[1].is<float>())
+                    return false;
+                b.out(out[0].as<float>(), out[1].as<float>());
             }
 
             if (a["center_out"].is<float>() || a["center_out"].is<int>())
@@ -217,7 +248,19 @@ template <typename E> bool load_json(E /*tag*/, RcConfig<E> &cfg, const char *js
                 continue;
 
             JsonObject s = kvp.value().as<JsonObject>();
-            auto b = cfg.sw(role);
+            if (!kvp.value().is<JsonObject>())
+                return false;
+            auto b = next.sw(role);
+
+            for (const char *field : {"values", "raw_levels"})
+                if (!s[field].isUnbound() && !s[field].is<JsonArray>())
+                    return false;
+            for (const char *field : {"hyst_us", "min_sep_us"})
+                if (!s[field].isUnbound() && !s[field].is<std::uint16_t>())
+                    return false;
+            if ((!s["auto_levels"].isUnbound() && !s["auto_levels"].is<bool>()) ||
+                (!s["learn_alpha"].isUnbound() && !s["learn_alpha"].is<float>()))
+                return false;
 
             if (s["values"].is<JsonArray>())
             {
@@ -228,6 +271,8 @@ template <typename E> bool load_json(E /*tag*/, RcConfig<E> &cfg, const char *js
                 std::uint8_t n = 0;
                 for (JsonVariant it : values)
                 {
+                    if (!it.is<float>())
+                        return false;
                     v[n++] = it.as<float>();
                 }
                 switch (n)
@@ -272,6 +317,8 @@ template <typename E> bool load_json(E /*tag*/, RcConfig<E> &cfg, const char *js
                 std::uint8_t n = 0;
                 for (JsonVariant it : raw_levels)
                 {
+                    if (!it.is<std::int16_t>())
+                        return false;
                     const int raw = it.as<int>();
                     if (raw < detail::kInt16MinValue || raw > detail::kInt16MaxValue)
                         return false;
@@ -335,6 +382,7 @@ template <typename E> bool load_json(E /*tag*/, RcConfig<E> &cfg, const char *js
         }
     }
 
+    cfg = next;
     return true;
 }
 

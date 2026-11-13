@@ -71,7 +71,8 @@ void loop()
     // Polling update() frequently is required to drain receiver bytes and track freshness.
     rclink.update();
 
-    if (rclink.healthy())
+    if (rclink.healthy() && rclink.role_valid(BasicRole::Steering) &&
+        rclink.role_valid(BasicRole::Throttle) && rclink.role_valid(BasicRole::Mode))
     {
         Serial.print(F("steering="));
         Serial.print(rclink.read(BasicRole::Steering));

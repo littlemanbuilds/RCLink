@@ -282,11 +282,16 @@ template <class Transport, typename E> class RcLink
      * @param baud Requested baud rate.
      * @param rxPin Receiver input pin.
      * @param txPin Optional transmit pin.
+     * @note Clears receiver freshness, output/filter history and runtime learning state.
+     * Caller configuration and signature settings remain; health requires a new frame.
      */
     template <typename SerialT> void begin(SerialT &port, std::uint32_t baud, int rxPin, int txPin)
     {
         tx_.begin(port, baud, rxPin, txPin);
         caps_ = tx_.caps();
+        // Reinitialization cannot carry permission to use the previous receiver frame.
+        // Reapply the caller's mapping, clearing histories and reseeding switch state.
+        (void)apply_config(cfg_);
     }
 
     /**
@@ -558,15 +563,17 @@ template <class Transport, typename E> class RcLink
             status_.required_roles_valid = config_valid_ && all_required_valid;
             status_.frame_valid = status_.required_roles_valid;
 
+            std::int8_t switch_candidate[N]{};
             for (std::size_t i = 0u; i < N; ++i)
             {
                 const bool valid = role_source_valid_[i];
+                switch_candidate[i] = sw_active_idx_[i];
 
                 if (!valid || !config_valid_)
                     continue;
 
                 const int raw = captured_raw_[cfg_.role_to_channel[i]];
-                scaled_.vals[i] = scale_channel_(i, raw);
+                scaled_.vals[i] = scale_channel_(i, raw, switch_candidate[i]);
 
                 const float alpha = cfg_.axis_ema_alpha[i];
                 if (alpha > 0.0f && cfg_.specs[i].kind == ChannelKind::Axis)
@@ -595,6 +602,7 @@ template <class Transport, typename E> class RcLink
                         continue;
                     filtered_.vals[i] = candidate_.vals[i];
                     last_good_.vals[i] = candidate_.vals[i];
+                    sw_active_idx_[i] = switch_candidate[i];
                     observe_and_learn_switch_(i);
                 }
             }
@@ -918,14 +926,15 @@ template <class Transport, typename E> class RcLink
      *
      * @param index Valid role index in an activated configuration.
      * @param raw Available receiver value in microseconds.
+     * @param switch_index Provisional switch selection, committed only after frame acceptance.
      * @return Rounded axis or switch output in application units.
      */
-    std::int16_t scale_channel_(std::size_t index, int raw)
+    std::int16_t scale_channel_(std::size_t index, int raw, std::int8_t &switch_index) const
     {
         const RcChannelSpec &spec = cfg_.specs[index];
         if (spec.kind == ChannelKind::Axis)
             return scale_axis_(index, raw);
-        return scale_switch_(index, raw);
+        return scale_switch_(index, raw, switch_index);
     }
 
     /**
@@ -974,10 +983,11 @@ template <class Transport, typename E> class RcLink
      * @brief Snap one switch input using explicit, learned, or evenly spaced levels.
      *
      * @param index Valid configured switch index.
-     * @param raw Receiver microseconds, clamped to the calibrated endpoints.
-     * @return Nearest configured application value; learned mode also updates the active position.
+     * @param raw Valid receiver microseconds; explicit levels use the unclamped sample.
+     * @param switch_index Provisional learned-position index; accepted history is never modified here.
+     * @return Configured application value after nearest-level selection and learned hysteresis.
      */
-    std::int16_t scale_switch_(std::size_t index, int raw)
+    std::int16_t scale_switch_(std::size_t index, int raw, std::int8_t &switch_index) const
     {
         const RcChannelSpec &spec = cfg_.specs[index];
         const RcSwitchSpec &sw = spec.sw;
@@ -995,7 +1005,7 @@ template <class Transport, typename E> class RcLink
             for (std::uint8_t i = 0u; i < sw.raw_count; ++i)
             {
                 const std::int32_t delta =
-                    static_cast<std::int32_t>(value) - static_cast<std::int32_t>(sw.raw_levels[i]);
+                    static_cast<std::int32_t>(raw) - static_cast<std::int32_t>(sw.raw_levels[i]);
                 const std::int32_t magnitude = (delta < 0) ? -delta : delta;
                 if (magnitude < best)
                 {
@@ -1008,34 +1018,33 @@ template <class Transport, typename E> class RcLink
 
         if (sw.auto_levels)
         {
-            if (sw_centroid_count_[index] == 0u)
-                seed_switch_centroids_(index, lo, hi, sw.count);
-
             const std::uint8_t nearest = nearest_centroid_(index, value);
-            const int active = static_cast<int>(sw_active_idx_[index]);
-            const int hysteresis_half = static_cast<int>(sw.hyst_us / 2u);
+            const int active = static_cast<int>(switch_index);
 
             if (active < 0)
             {
-                sw_active_idx_[index] = static_cast<std::int8_t>(nearest);
+                switch_index = static_cast<std::int8_t>(nearest);
             }
             else
             {
-                const int current_center = static_cast<int>(sw_centroid_[index][static_cast<std::size_t>(active)]);
-                const int current_delta = value - current_center;
-                const int current_distance = (current_delta < 0) ? -current_delta : current_delta;
-                if (current_distance > hysteresis_half)
-                {
-                    const int next_center = static_cast<int>(sw_centroid_[index][nearest]);
-                    const int next_delta = value - next_center;
-                    const int next_distance = (next_delta < 0) ? -next_delta : next_delta;
-                    if (next_distance + 2 <= current_distance)
-                        sw_active_idx_[index] = static_cast<std::int8_t>(nearest);
-                }
+                // Cross each adjacent midpoint plus half the total hysteresis band.
+                // Doubled arithmetic retains half-us boundaries and odd band widths.
+                // Walking adjacent boundaries also permits large legitimate jumps.
+                int selected = active;
+                const std::int32_t doubled = static_cast<std::int32_t>(value) * 2;
+                while (selected < static_cast<int>(nearest) &&
+                       doubled > static_cast<std::int32_t>(sw_centroid_[index][selected]) +
+                                     sw_centroid_[index][selected + 1] + sw.hyst_us)
+                    ++selected;
+                while (selected > static_cast<int>(nearest) &&
+                       doubled < static_cast<std::int32_t>(sw_centroid_[index][selected - 1]) +
+                                     sw_centroid_[index][selected] - sw.hyst_us)
+                    --selected;
+                switch_index = static_cast<std::int8_t>(selected);
             }
 
             const std::uint8_t output_index =
-                (sw_active_idx_[index] >= 0) ? static_cast<std::uint8_t>(sw_active_idx_[index]) : nearest;
+                (switch_index >= 0) ? static_cast<std::uint8_t>(switch_index) : nearest;
             return round_int16_(sw.vals[output_index]);
         }
 
@@ -1354,9 +1363,7 @@ template <class Transport, typename E> class RcLink
      */
     void pull_transport_diagnostics_() noexcept
     {
-        const std::uint32_t frames = detail::transport_frames(tx_, 0);
-        if (frames != 0u || status_.has_frame)
-            status_.frames = frames;
+        status_.frames = detail::transport_frames(tx_, 0);
         status_.crc_errors = detail::transport_crc_errors(tx_, 0);
         status_.parse_errors = detail::transport_parse_errors(tx_, 0);
         status_.parser_timeouts = detail::transport_parser_timeouts(tx_, 0);

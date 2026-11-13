@@ -223,7 +223,7 @@ static bool is_axis_by_hist(const Stats &s, int ch, int spanUs)
  * @return ChClass::Switch3 if values look like a common 3-position switch.
  * @return ChClass::Axis otherwise.
  */
-static ChClass snap_2_or_3pos_if_common(const int *lv, std::uint8_t n)
+static inline ChClass snap_2_or_3pos_if_common(const int *lv, std::uint8_t n)
 {
     if (n < 2 || n > 3)
         return ChClass::Axis;
@@ -269,6 +269,7 @@ static ChClass snap_2_or_3pos_if_common(const int *lv, std::uint8_t n)
  */
 static ChClass classify_channel(const Stats &s, int ch, int spanUs, const int *levels, std::uint8_t levelCount)
 {
+    (void)levels; // Retained helper signature; cluster count already decides discrete classification.
     if (spanUs < kSpanNoneUs)
         return ChClass::NoInput;
     if (is_axis_by_hist(s, ch, spanUs))
@@ -281,12 +282,6 @@ static ChClass classify_channel(const Stats &s, int ch, int spanUs, const int *l
     if (levelCount >= 4 && levelCount <= kSwitchMaxLevels && spanUs <= kSpanSwitchMaxUs)
         return ChClass::SwitchN;
 
-    if (levelCount == 2 || levelCount == 3)
-    {
-        const ChClass snap = snap_2_or_3pos_if_common(levels, levelCount);
-        if (snap != ChClass::Axis)
-            return snap;
-    }
     return ChClass::Axis;
 }
 
@@ -367,7 +362,8 @@ inline void run_ibus(::HardwareSerial &uart, int rxPin, int txPin, std::uint32_t
         if (raw < kAxisMinSane || raw > kAxisMaxSane)
             return;
 
-        s.samples[chIdx]++;
+        if (s.samples[chIdx] != UINT32_MAX)
+            s.samples[chIdx]++;
         if (raw < s.minv[chIdx])
             s.minv[chIdx] = raw;
         if (raw > s.maxv[chIdx])
@@ -391,7 +387,8 @@ inline void run_ibus(::HardwareSerial &uart, int rxPin, int txPin, std::uint32_t
 
         // Histogram.
         const int bi = bin_index(raw);
-        s.hist[chIdx][bi]++;
+        if (s.hist[chIdx][bi] != UINT16_MAX)
+            s.hist[chIdx][bi]++;
 
         // Cluster into discrete levels (for switches).
         std::uint8_t &cnt = s.lcnt[chIdx];
@@ -401,7 +398,8 @@ inline void run_ibus(::HardwareSerial &uart, int rxPin, int txPin, std::uint32_t
             {
                 // Gentle EMA center.
                 s.levels[chIdx][i] = (s.levels[chIdx][i] * 7 + raw) / 8;
-                s.occ[chIdx][i]++;
+                if (s.occ[chIdx][i] != UINT16_MAX)
+                    s.occ[chIdx][i]++;
                 return;
             }
         }
@@ -424,13 +422,14 @@ inline void run_ibus(::HardwareSerial &uart, int rxPin, int txPin, std::uint32_t
             break;
         }
 
-        (void)bus.update();
+        const bool new_frame = bus.update();
 
         const int chMax = (maxChannels <= Stats::K) ? maxChannels : Stats::K;
         for (int ch = 0; ch < chMax; ++ch)
         {
             const int v = bus.readRaw(ch); // ≤ kNoSignalThresholdUs => “no signal”.
-            if (v > kNoSignalThresholdUs)
+            // update() reports a new valid decoded batch; readRaw() alone can be stale.
+            if (new_frame && v > kNoSignalThresholdUs)
                 addSample(static_cast<std::uint8_t>(ch), v);
         }
 
