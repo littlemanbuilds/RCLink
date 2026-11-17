@@ -6,6 +6,8 @@
 
 #include <Arduino.h>
 #include <RCLink.h>
+#include <calibration/Sbus_Calibrate.hpp> // Empty optional surface on non-ESP32 targets.
+#include <transport/detail/SbusDecoder.hpp>
 
 #define TEST_ROLES(X) \
     X(Throttle)       \
@@ -26,11 +28,14 @@ struct NullTransport
     rc::RcTransportCaps caps() const { return rc::RcTransportCaps{}; }
 };
 
+rc::detail::SbusDecoder sbusDecoder;
 NullTransport transport;
 rc::RcLink<NullTransport, TestRole> rclink(transport);
 
 void setup()
 {
+    uint16_t native = 0;
+    (void)sbusDecoder.tryReadNative(0, native);
     RC_CONFIG(TestRole, cfg);
     RC_CFG_MAP_DEFAULT(TestRole, cfg);
     cfg.axis(TestRole::Throttle).raw(1000, 2000, 1000).out(0.0f, 100.0f).done();

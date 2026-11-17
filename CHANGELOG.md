@@ -2,6 +2,45 @@
 
 All notable RCLink changes are documented here.
 
+## [1.4.0] - Unreleased (locally prepared)
+
+### Added
+
+- S.BUS-only `tryReadNative()` copies accepted 11-bit channel codes with explicit
+  reception, index, reset, freshness and status semantics. Existing conversion and
+  role APIs are unchanged.
+- `lostFrames()` and `failsafeFrames()` retain cumulative accepted-frame evidence
+  across polling batches while preserving latest-frame flag semantics.
+- `03_SbusCalibration` provides the same guided begin/sample/stop workflow as iBUS,
+  using one shared fixed-capacity statistics and suggestion engine for 14/16 channels.
+- The advanced native/CSV monitor is retained at test/sbus_diagnostic, paired with
+  the existing host capture tool; it is separate from beginner calibration.
+- Exhaustive native/channel and focused transport, reset, malformed-frame, batch,
+  allocation and calibrated-compatibility regressions.
+
+### Release preparation
+
+- Ordered examples 01–06 as basic iBUS, iBUS calibration, S.BUS calibration, Flysky,
+  JSON and advanced features, preserving creation dates. Both calibration sketches
+  delegate to protocol-specific helpers over one shared core.
+- Calibration output uses human CH labels with unchanged zero-based mappings.
+  Centres are labelled provisional; sparse data is omitted and narrow-axis centre/
+  deadband suggestions are bounded to satisfy existing configuration validation.
+  Ambiguous switch levels closer than the default separation are omitted consistently
+  from text and JSON rather than emitting rejected configurations.
+- Host capture is quiet by default with optional full echo, exact binary recording,
+  explicit integrity diagnostics and synthetic serial regressions.
+- Prepared consistent 1.4.0 metadata, API keyword entries and an ordinary-commit
+  release checklist. Publication and registry availability remain separate gates.
+
+### Qualification
+
+- An isolated ESP32-S3 / FS-i6X / FS-iA6B S.BUS session verified native/converted
+  values, CH1–CH10 controls, transmitter-off bits, signal timeout and recovery.
+  Receiver-specific endpoints explain prior converted values without a scaling
+  change. Sampled logging does not establish guaranteed RF-loss latency.
+- See the Verified physical S.BUS scope in RELEASE_CHECKLIST.md for scope and retained limits.
+
 ## [1.3.1] - 2026-11-13
 
 ### Fixed

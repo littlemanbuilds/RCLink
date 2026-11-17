@@ -3,7 +3,7 @@
  *
  * @brief Load an RCLink role configuration from JSON after declaring the role enum.
  *
- * @file 04_JsonConfigDemo.ino
+ * @file 05_JsonConfigDemo.ino
  * @author Little Man Builds (Darren Osborne)
  * @date 2025-10-08
  * @copyright Copyright (c) 2026 Little Man Builds
@@ -20,7 +20,7 @@ const int RX_PIN = 18;
 const int TX_PIN = -1;
 const uint32_t IBUS_BAUD = 115200; // Exact-width UART baud argument; 115200 exceeds a 16-bit int.
 
-// ---- Roles (same as previous demo) ---- //
+// ---- Ten receiver roles for JSON name matching ---- //
 
 #define RC_ROLES(_)                                                                                                    \
     _(Ch1)                                                                                                             \

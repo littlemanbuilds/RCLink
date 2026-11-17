@@ -37,7 +37,24 @@ props_ver="$(awk -F= '$1=="version"{print $2}' "$TARGET/library.properties")"
 json_ver="$(python3 -B -c 'import json,sys; print(json.load(open(sys.argv[1]))["version"])' "$TARGET/library.json")"
 header_ver="$(sed -n 's/^#define RCLINK_VERSION "\([^"]*\)"/\1/p' "$TARGET/src/RCLink.h")"
 [[ "$props_ver" == "$json_ver" && "$props_ver" == "$header_ver" ]] || fail "version mismatch"
-[[ "$props_ver" == "1.3.1" ]] || fail "unexpected release version $props_ver"
+[[ "$props_ver" == "1.4.0" ]] || fail "unexpected release version $props_ver"
+python3 -B -c 'import pathlib,re,sys
+root=pathlib.Path(sys.argv[1])
+header=(root/"src/RCLink.h").read_text()
+for name,value in (("MAJOR",1),("MINOR",4),("PATCH",0)):
+    match=re.search(r"^#define RCLINK_VERSION_"+name+r" ([0-9]+)$",header,re.M)
+    if not match or int(match[1])!=value:
+        raise SystemExit("release-contract: numeric version mismatch: "+name)
+readme=(root/"README.md").read_text()
+if "**Version:** 1.4.0" not in readme or "Current version:\n\n```text\n1.4.0\n```" not in readme:
+    raise SystemExit("release-contract: README release identity mismatch")
+if not (root/"CHANGELOG.md").read_text().split("## ",1)[1].startswith("[1.4.0]"):
+    raise SystemExit("release-contract: changelog release identity mismatch")
+if not (root/"RELEASE_CHECKLIST.md").read_text().startswith("# RCLink v1.4.0 release checklist"):
+    raise SystemExit("release-contract: checklist release identity mismatch")
+for name in ("tryReadNative","lostFrames","failsafeFrames","run_sbus"):
+    if not re.search(r"^"+name+r"\s+KEYWORD2$",(root/"keywords.txt").read_text(),re.M):
+        raise SystemExit("release-contract: missing API keyword: "+name)' "$TARGET"
 grep -Fqx 'license=MIT' "$TARGET/library.properties" || fail "library.properties must declare MIT"
 
 python3 -B -c 'import json
@@ -76,13 +93,23 @@ done
 
 python3 -B -c 'import json
 import pathlib
+import re
 import sys
 
 metadata = json.load(open(sys.argv[1]))
 root = pathlib.Path(sys.argv[2])
 examples = metadata.get("examples", [])
-if len(examples) != 5:
-    raise SystemExit(f"release-contract: expected 5 examples, found {len(examples)}")
+expected = ["01_BasicIbusLink", "02_IbusCalibration", "03_SbusCalibration", "04_FlyskyFSi6XDemo", "05_JsonConfigDemo", "06_AdvancedFeatureDemo"]
+if examples != [f"examples/{name}/{name}.ino" for name in expected]:
+    raise SystemExit("release-contract: release example inventory mismatch")
+if set(examples) != {str(p.relative_to(root)) for p in (root / "examples").glob("*/*.ino")}:
+    raise SystemExit("release-contract: example metadata does not match supplied sketches")
+ci=(root/".github/workflows/ci.yml").read_text()
+if re.findall(r"^\s+- (examples/[^\n]+[.]ino)$",ci,re.M) != examples:
+    raise SystemExit("release-contract: CI example inventory mismatch")
+for example in examples:
+    if "@file "+pathlib.Path(example).name not in (root/example).read_text():
+        raise SystemExit("release-contract: example file tag mismatch: "+example)
 missing = [example for example in examples if not (root / example).is_file()]
 if missing:
     raise SystemExit("release-contract: missing metadata example: " + ", ".join(missing))' "$TARGET/library.json" "$TARGET"
@@ -131,7 +158,7 @@ if [[ "$STRICT_DISTRIBUTION" -eq 1 ]]; then
     python3 -B -c 'import pathlib,sys
 root=pathlib.Path(sys.argv[1])
 private={".git", ".lmb", ".codex", ".agents", ".aws", ".ssh", ".dependencies", "__MACOSX", ".pio", ".vscode", ".idea"}
-names={"AGENTS.md", "credentials", "credentials.json", ".env", "id_rsa", "id_ed25519"}
+names={"AGENTS.md", "credentials", "credentials.json", ".env", "id_rsa", "id_ed25519", "RCLINK_140_FINALIZATION_REPORT.md", "RCLINK_140_CALIBRATION_FINAL_REPORT.md", "RCLINK_140_RELEASE_ASSURANCE.md"}
 for p in root.rglob("*"):
     if p.is_symlink() or p.name in private or p.name in names or p.name.startswith(".env."):
         raise SystemExit("release-contract: private or linked distribution member: "+str(p.relative_to(root)))' "$TARGET"

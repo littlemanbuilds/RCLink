@@ -3,7 +3,7 @@
  *
  * @brief Commission and observe a shaped RC input with receiver-failsafe diagnostics.
  *
- * @file 05_AdvancedFeatureDemo.ino
+ * @file 06_AdvancedFeatureDemo.ino
  * @author Little Man Builds (Darren Osborne)
  * @date 2025-10-08
  * @copyright Copyright (c) 2026 Little Man Builds

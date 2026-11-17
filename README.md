@@ -2,16 +2,16 @@
 
 RCLink is a small Arduino RC receiver library that turns raw receiver channels into **named, calibrated application controls**.
 
-It provides iBUS and ESP32 SBUS transports, role mapping, axis shaping, deterministic switch decoding, filtering, link/failsafe status, receiver-failsafe signature detection, an optional ArduinoJson configuration loader, and an iBUS calibration helper.
+It provides iBUS and ESP32 SBUS transports, role mapping, axis shaping, deterministic switch decoding, filtering, link/failsafe status, receiver-failsafe signature detection, an optional ArduinoJson configuration loader, and guided iBUS/ESP32 S.BUS calibration helpers.
 
 RCLink is intentionally **not** a motor controller, safety supervisor, authority router, or vehicle-state library. Its job is to answer a narrower question well:
 
 > **What is the receiver currently asking for, and is that receiver data valid enough to use?**
 
-- **Version:** 1.3.1
+- **Version:** 1.4.0 (locally prepared release candidate; not published)
 - **Author:** Little Man Builds
 - **License:** MIT
-- **Qualification:** software-qualified with focused ESP32-S3 iBUS and configured receiver-signature tests. General RF-loss detection, SBUS hardware and vehicle safety remain unqualified. See [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md).
+- **Qualification:** software-qualified with focused ESP32-S3 iBUS and configured receiver-signature tests. General RF-loss detection and vehicle safety remain unqualified. A focused isolated S.BUS bench session is described below. See [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md).
 
 ---
 
@@ -34,7 +34,8 @@ RCLink is intentionally **not** a motor controller, safety supervisor, authority
 - [Commissioning switch learning](#commissioning-switch-learning)
 - [Transports and parser resilience](#transports-and-parser-resilience)
 - [JSON configuration](#json-configuration)
-- [iBUS calibration helper](#ibus-calibration-helper)
+- [Receiver calibration helpers](#receiver-calibration-helpers)
+- [Native S.BUS commissioning](#native-sbus-commissioning)
 - [Examples](#examples)
 - [Testing and validation](#testing-and-validation)
 - [API reference](#api-reference)
@@ -117,31 +118,28 @@ Include the public umbrella header after installing the library:
 #include <RCLink.h>
 ```
 
-For a manual 1.3.1 install, use the curated source ZIP from the
-[GitHub release](https://github.com/littlemanbuilds/RCLink/releases) once published:
-
-**Sketch → Include Library → Add .ZIP Library…**
-
-For a ZIP installation, install ArduinoJson 7.x separately through Library Manager;
-7.4.3 is the tested dependency. Include `RCLink.h` from your sketch.
+Version 1.4.0 is locally prepared; it has not been committed, qualified by remote
+CI, tagged, published or confirmed in either registry as part of this work.
+For local evaluation, install a curated source ZIP using **Sketch → Include Library
+→ Add .ZIP Library…** and install ArduinoJson 7.x separately. Version 7.4.3 is the
+tested dependency. Do not package the entire development directory.
 
 ### PlatformIO
 
+After the operator has published and verified the immutable tag, this pinned URL
+will select the release:
+
 ```ini
 lib_deps =
-    https://github.com/littlemanbuilds/RCLink.git#v1.3.1
+    https://github.com/littlemanbuilds/RCLink.git#v1.4.0
 ```
 
-The prospective `v1.3.1` tag must be published before this pinned Git URL resolves.
-RCLink is registered in [Arduino Library Manager](https://www.arduino.cc/reference/en/libraries/rclink/)
-and [PlatformIO Registry](https://registry.platformio.org/libraries/littlemanbuilds/RCLink).
-As checked on 2026-11-13, both list 1.2.0 as their latest version. Do not assume
-1.3.1 is available from either registry until its listing is confirmed after release.
-
-`ArduinoJson` is declared as a dependency; PlatformIO specifies `^7.4.2`, and 7.4.3
-was used for qualification. Upgrade to the published 1.3.1 source/tag, rebuild your
-application, and recheck its mapping, calibration and failsafe policy on the intended
-receiver before enabling actuation.
+Until then, use the reviewed local source. A prepared version, a local commit,
+successful CI on that exact commit, a GitHub tag/release and external registry
+availability are separate states. Check Arduino Library Manager and PlatformIO
+Registry independently after publication; prior listings do not prove 1.4.0 is
+available. ArduinoJson is declared as a dependency (`^7.4.2` in PlatformIO).
+Recheck mapping, receiver-specific calibration and failsafe behavior before use.
 
 ---
 
@@ -316,7 +314,7 @@ if (rclink.healthy() && rclink.role_valid(MyRole::Steering))
 ### 7. Calibrate the actual transmitter and receiver
 
 Next open `02_IbusCalibration`, move every stick, knob, and switch through its
-full travel, then replace the illustrative raw values above with measured
+full travel (use `03_SbusCalibration` for S.BUS), then replace the illustrative raw values above with measured
 values. A physical centre such as `1000 / 1588 / 2000` is valid; RCLink uses
 the explicit centre rather than assuming the midpoint.
 
@@ -891,22 +889,108 @@ A JSON parse succeeding does not replace normal configuration validation. Apply 
 
 ---
 
-## iBUS calibration helper
+## Receiver calibration helpers
 
-The calibration helper is intentionally separate from the runtime mapper:
+First establish a connection with `01_BasicIbusLink`. Then use the matching guided
+utility: `02_IbusCalibration` for iBUS, or `03_SbusCalibration` for ESP32 S.BUS.
+Both sketches initialize Serial at 115200, include their calibration helper, and
+call it from setup; loop is empty while the helper owns the session.
 
 ```cpp
-#include <calibration/Ibus_Calibrate.hpp>
+#include <calibration/Ibus_Calibrate.hpp> // calibrate::run_ibus(...)
+#include <calibration/Sbus_Calibrate.hpp> // ESP32 only: calibrate::run_sbus(...)
 ```
 
-Run `02_IbusCalibration` when commissioning a new transmitter/receiver pair,
-after confirming the normal object lifecycle with Example 01.
+Connect receiver RX and common ground using compatible signal levels and keep
+actuators disconnected. iBUS normally uses 115200-baud 8N1; S.BUS uses inverted 100000-baud 8E2
+with no receiver TX. Press a key to begin, slowly visit every stick/knob/switch
+position and let sprung axes rest at neutral, then press a key to stop. Both helpers
+show human CH1…CH14/CH16 labels, min/max/span and provisional axis/switch suggestions,
+followed by optional JSON. JSON channel mappings remain zero-based.
 
-Calibration is commissioning information. The values you measure should eventually become deterministic runtime configuration rather than continuously changing calibration state.
+Suggestions use converted raw values, never native S.BUS codes or a universal
+1000/1500/2000 remap. Every inferred midpoint or coarse dwell-bin centre is explicitly
+provisional: a rotary control's mechanical centre may be unknown. Verify the centre,
+classification, endpoint traversal and deadband before applying any suggestion.
+For a non-spring throttle, true zero may be the low endpoint rather than the estimated
+centre; the suggestions do not automatically validate motion-control calibration.
+Sparse observations are omitted. No-frame, stale and S.BUS lost/failsafe batches
+cannot enter statistics; cumulative counters also exclude faults superseded within
+a polling batch. Live readings are labelled cached and are not RF-health proof.
+Use receiver-specific measured calibration; values are not automatically transferable
+between protocols. Runtime roles continue to use the existing configuration API.
+
+The helpers share one private statistics/presentation implementation, with 14/16
+fixed channel capacities and protocol-owned UART setup/acceptance. Existing iBUS
+helper types and callable signatures remain available. No transport redesign or
+receive-path allocation is introduced. After calibration, continue to the mapped
+Flysky example 04, JSON example 05, and advanced shaping/status example 06.
+
+---
+
+## Native S.BUS commissioning
+
+The beginner workflow is `03_SbusCalibration`, described above. For raw/native
+engineering measurements, the opt-in developer producer is
+[test/sbus_diagnostic/SbusDiagnostic.ino](test/sbus_diagnostic/SbusDiagnostic.ino).
+Its [separate capture instructions](test/sbus_diagnostic/README.md) retain the
+six-channel live display, extrema, CH7–CH10 summaries, fault counters and CSV.
+It is not an additional public learning example.
+
+`RcSbusEsp32Transport::tryReadNative(int channel, uint16_t& value)` copies the
+original 11-bit analogue code (0–2047), indexed **0–15**, independently of roles.
+It returns false with the destination unchanged before reception, after `begin()`,
+or for an invalid index. Native values, `readRaw()`, latest flags, `frames()` and
+`lastGoodMs()` refer to the same accepted frame. Partial/malformed frames cannot
+replace that evidence. Reads return true even when that frame is stale, lost or
+failsafe; callers must assess age and flags separately. Call reads and updates in
+one polling context; there is no concurrent snapshot guarantee. No heap allocation
+is added to parsing; storage is fixed (16 native codes, reception validity and two
+32-bit counters). iBUS already returns its decoded native pulse-width-style channel
+words through `readRaw()`; no new iBUS API or scaling is introduced.
+
+The unchanged S.BUS conversion is integer C++ arithmetic:
+
+```text
+converted = clamp(1000 + ((native - 172) * 1000) / 1639, 800, 2200)
+```
+
+Division truncates toward zero. Codes 0/172/992/1811/2047 convert to
+896/1000/1500/2000/2143. These are pulse-width-style units, **not measured pulse
+widths**. Calibration consumes this converted representation and then maps it to
+role outputs; physical endpoints need not equal 172/1811. The sketch's signed
+percentage `(native - 992) * 200 / 1639` is an unclamped diagnostic reference,
+not an application command. It retains floating precision until output formatting;
+extrema retain exact integer codes and converted values.
+
+`frameLost()` and `protoFailsafe()` still describe only the latest accepted frame.
+`lostFrames()` and `failsafeFrames()` count accepted frames bearing each bit,
+including frames superseded in a poll. They do not count individual RF-loss incidents. Counts reset on `begin()` and wrap modulo
+2^32: compare unsigned deltas to observe interval evidence and recovery. They do
+not latch safety decisions or change `RcLinkStatus`. `frames()` is a wire-frame
+acceptance counter, while `RcLinkStatus::frame_sequence` remains a successful-poll
+counter. A 10 Hz log cannot show every frame's channel values or exact fault onset.
+
+Use the developer diagnostic's capture instructions for advanced sampling and
+measurement limits; ordinary calibration does not require CSV or a host script.
 
 ---
 
 ## API reference
+
+S.BUS transport diagnostics (single polling context):
+
+| Method | Meaning |
+| --- | --- |
+| `tryReadNative(channel, value)` | Copy code 0–2047 at zero-based channel 0–15; false leaves value unchanged before reception, after begin/reset or for an invalid index. Success does not prove freshness or RF health. |
+| `readRaw(channel)` | Existing converted pulse-width-style value, not a measured pulse width; use receiver-specific endpoints for role calibration. |
+| `lostFrames()` / `failsafeFrames()` | Unsigned cumulative counts of accepted frames carrying each flag, not RF-loss incidents; survive later healthy frames and wrap modulo 2^32. |
+| `frameLost()` / `protoFailsafe()` | Flags of the latest accepted frame; recovery may clear them while cumulative history remains. |
+| `frames()` / `lastGoodMs()` | Accepted-frame identity/timestamp for the same latest native/converted data. |
+
+Stale and faulted native values remain readable for diagnostics. Updates and reads
+belong in one polling context; no cross-task atomic snapshot is promised. See
+[Native S.BUS commissioning](#native-sbus-commissioning) for the full contract.
 
 ### Main types
 
@@ -1004,17 +1088,23 @@ one-sided axes, switch, configuration activation, update, health, and reads.
 
 A deliberate commissioning utility for identifying channel ranges and switch positions.
 
-### `03_FlyskyFSi6XDemo`
+### `03_SbusCalibration`
+
+The equivalent guided S.BUS calibration path: press-to-begin/stop, converted-raw
+statistics, provisional configuration and JSON suggestions for all 16 analogue channels.
+
+### `04_FlyskyFSi6XDemo`
 
 A straightforward ten-channel Flysky example using named roles, axes and switches.
 
-### `04_JsonConfigDemo`
+### `05_JsonConfigDemo`
 
 Loads equivalent configuration from JSON. Use after you understand the direct builder approach.
 
-### `05_AdvancedFeatureDemo`
+### `06_AdvancedFeatureDemo`
 
 Adds filtering, epsilon suppression, per-role failsafe policies, receiver-failsafe signature detection and status diagnostics.
+
 
 ---
 
@@ -1061,11 +1151,12 @@ Runs AddressSanitizer and UndefinedBehaviorSanitizer over the deterministic suit
 
 ### Cross-platform compile matrix
 
-The selected portable API and all five ESP32-S3 examples passed the
-[13-job GitHub Actions run](https://github.com/littlemanbuilds/RCLink/actions/runs/43492344319)
-on the reviewed pre-amendment candidate, including both SAMD and SAM boards.
-The final amended release commit still requires its own successful CI run; see
-[RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md).
+The earlier 1.3.1 candidate had a successful historical
+[GitHub Actions run](https://github.com/littlemanbuilds/RCLink/actions/runs/43492344319).
+That receipt does not qualify 1.4.0. The current release matrix selects all seven
+repository targets and all six examples independently; see
+[RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md) for local qualification and the separate
+exact-commit CI/publication gates.
 
 ### Hardware tests still matter
 
@@ -1094,7 +1185,13 @@ the first nonmatching update. A temporary safer-preset trial confirmed after 255
 with the same 250 ms hold; motion values were already zero and its diagnostic
 application disarmed before confirmation. Both signature timings include fixture
 overhead and exclude the receiver's internal RF-loss reaction time. Recovery succeeded;
-the diagnostic latch required a separate rearm. Physical SBUS, general RF-loss detection and
+the diagnostic latch required a separate rearm. A later isolated S.BUS session with
+the developer S.BUS diagnostic verified CH1–CH10 reception, native-to-converted agreement,
+transmitter-off frame-lost/failsafe bits, recovery and signal-interruption timeout.
+Most measured endpoints were 240/1807 native (1041/1997 converted), with resting
+centres 1024 (1519 converted); CH4's observed high 1796–1797 was lower. These are
+receiver-specific measurements, not defaults. The 10Hz log cannot qualify guaranteed
+RF-loss timing or continuous wire-frame delivery. General RF-loss detection and
 installation safety remain unqualified. See
 [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md) for the observed scope and deferred checks.
 
@@ -1283,7 +1380,7 @@ Histogram and dwell counters saturate instead of wrapping.
 Current version:
 
 ```text
-1.3.1
+1.4.0
 ```
 
 See [CHANGELOG.md](CHANGELOG.md) for detailed release history.

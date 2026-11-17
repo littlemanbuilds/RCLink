@@ -28,3 +28,8 @@ fi
   -DRCLINK_NO_LEGACY_GLOBAL_ALIASES -I"$ROOT/test/native/arduino_stub" -I"$ROOT/src" \
   "$ROOT/test/native/v1_1_compat.cpp" -o "$BUILD/v1_1_namespace_only"
 "$BUILD/v1_1_namespace_only"
+
+"$CXX" -std=c++11 -Wall -Wextra -Wpedantic -Wconversion -Wsign-conversion -Wshadow -Werror \
+  -I"$ROOT/test/native/arduino_stub" -I"$ROOT/src" \
+  "$ROOT/test/native/test_sbus.cpp" -o "$BUILD/test_sbus"
+"$BUILD/test_sbus"

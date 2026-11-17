@@ -14,11 +14,12 @@ static std::vector<std::uint8_t> packet(int raw) {
 static void run(HardwareSerial &uart, unsigned expected) {
     clock_ms()=0; Serial=Monitor{}; Serial.stop=5000+static_cast<std::uint32_t>(uart.packets.size())*2+200;
     rc::calibrate::run_ibus(uart,18,-1,115200,1);
-    auto at=Serial.output.find(" 0 |"); CHECK(at!=std::string::npos);
-    int span=0; unsigned clusters=0; unsigned long samples=0;
-    CHECK(std::sscanf(Serial.output.c_str()+at," 0 | %d | %u | %lu",&span,&clusters,&samples)==3);
+    auto at=Serial.output.find("CH1 |"); CHECK(at!=std::string::npos);
+    int lo=0,hi=0,span=0; unsigned clusters=0; unsigned long samples=0;
+    CHECK(std::sscanf(Serial.output.c_str()+at,"CH1 | %d | %d | %d | %u | %lu",&lo,&hi,&span,&clusters,&samples)==5);
     if(samples!=expected) std::cerr << "packets=" << uart.packets.size() << " samples=" << samples << " expected=" << expected << '\n';
     CHECK(samples==expected);
+    CHECK(expected ? (lo>=800 && hi<=2200 && lo<=hi && span==hi-lo) : (lo==0 && hi==0));
 }
 int main() {
     HardwareSerial one; one.packets={packet(1500)}; run(one,1);

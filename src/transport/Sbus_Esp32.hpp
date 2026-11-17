@@ -90,14 +90,52 @@ class RcSbusEsp32Transport
     }
 
     /**
-     * @brief Read one decoded SBUS channel in approximate microseconds.
+     * @brief Read one decoded SBUS channel in pulse-width-style units.
      *
      * @param ch Zero-based analogue channel index.
-     * @return Last decoded approximate microseconds; zero before reception or for an invalid index.
+     * @return Last converted value (not a measured pulse width); zero before reception or for an invalid index.
      */
     int readRaw(int ch) const noexcept
     {
         return decoder_.readRaw(ch);
+    }
+
+    /**
+     * @brief Copy a native S.BUS analogue code from the latest accepted frame.
+     *
+     * Native, readRaw(), flags, frames() and lastGoodMs() share the same frame.
+     * Call only in the update/begin polling context; access is not synchronized.
+     * No normalization is applied. Stale/lost/failsafe frames remain readable;
+     * use lastGoodMs() and flags separately to assess freshness and status.
+     *
+     * @param channel Zero-based analogue channel index [0,15].
+     * @param value Destination; unchanged on failure.
+     * @return True with a code in [0,2047]; false before the first accepted frame,
+     *         after begin(), or for an invalid index.
+     */
+    bool tryReadNative(int channel, std::uint16_t &value) const noexcept
+    {
+        return decoder_.tryReadNative(channel, value);
+    }
+
+    /**
+     * @brief Count accepted frame-lost frames, including superseded frames.
+     *
+     * @return Modulo-2^32 count since begin(); use unsigned interval deltas.
+     */
+    std::uint32_t lostFrames() const noexcept
+    {
+        return decoder_.lostFrames();
+    }
+
+    /**
+     * @brief Count accepted failsafe frames, including superseded frames.
+     *
+     * @return Modulo-2^32 count since begin(); use unsigned interval deltas.
+     */
+    std::uint32_t failsafeFrames() const noexcept
+    {
+        return decoder_.failsafeFrames();
     }
 
     /**

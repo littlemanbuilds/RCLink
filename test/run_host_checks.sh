@@ -7,6 +7,7 @@ for CXX in "${GCC_CXX:-g++}" clang++; do
         CXX="$CXX" bash "$ROOT/test/run_helper_tests.sh"
     fi
 done
+python3 -B "$ROOT/test/test_capture_sbus.py"
 CXX=clang++ bash "$ROOT/test/run_sanitizers.sh"
 bash "$ROOT/test/check_release_contracts.sh"
 bash "$ROOT/test/check_distribution.sh"

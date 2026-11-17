@@ -3,6 +3,11 @@
  *
  * @brief Run the iBUS commissioning calibration helper on an ESP32-S3 receiver input.
  *
+ * Connect receiver RX and common ground using compatible signal levels, with
+ * actuators disconnected. At 115200-baud Serial Monitor, press a key to begin,
+ * visit all control positions, then press a key to stop. Verify provisional
+ * centre and classification suggestions before applying them to role settings.
+ *
  * @file 02_IbusCalibration.ino
  * @author Little Man Builds (Darren Osborne)
  * @date 2025-10-08

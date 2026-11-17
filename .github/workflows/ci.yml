@@ -38,6 +38,9 @@ jobs:
         env:
           ARDUINOJSON_INCLUDE: ${{ github.workspace }}/.dependencies/ArduinoJson/src
 
+      - name: Host capture regressions
+        run: python3 -B test/test_capture_sbus.py
+
       - name: Sanitizers
         run: bash test/run_sanitizers.sh
         env:
@@ -84,9 +87,10 @@ jobs:
         example:
           - examples/01_BasicIbusLink/01_BasicIbusLink.ino
           - examples/02_IbusCalibration/02_IbusCalibration.ino
-          - examples/03_FlyskyFSi6XDemo/03_FlyskyFSi6XDemo.ino
-          - examples/04_JsonConfigDemo/04_JsonConfigDemo.ino
-          - examples/05_AdvancedFeatureDemo/05_AdvancedFeatureDemo.ino
+          - examples/03_SbusCalibration/03_SbusCalibration.ino
+          - examples/04_FlyskyFSi6XDemo/04_FlyskyFSi6XDemo.ino
+          - examples/05_JsonConfigDemo/05_JsonConfigDemo.ino
+          - examples/06_AdvancedFeatureDemo/06_AdvancedFeatureDemo.ino
     steps:
       - uses: actions/checkout@v5
 

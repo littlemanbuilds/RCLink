@@ -28,6 +28,9 @@ update                      KEYWORD2
 read                        KEYWORD2
 read_by_index               KEYWORD2
 try_read                    KEYWORD2
+tryReadNative               KEYWORD2
+lostFrames                  KEYWORD2
+failsafeFrames              KEYWORD2
 role_valid                  KEYWORD2
 frame                       KEYWORD2
 status                      KEYWORD2
@@ -43,6 +46,7 @@ finalize_switch_learning    KEYWORD2
 copy_switch_levels          KEYWORD2
 load_json                   KEYWORD2
 run_ibus                    KEYWORD2
+run_sbus                    KEYWORD2
 
 #######################################
 # Macros (KEYWORD2)

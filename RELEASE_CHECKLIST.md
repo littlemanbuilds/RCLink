@@ -1,28 +1,86 @@
-# RCLink v1.3.1 release checklist
+# RCLink v1.4.0 release checklist
 
-## Accepted release scope
+## Current release scope
 
-The owner accepted a **software-qualified source release**, followed by one focused
-physical iBUS and receiver-signature tests. The observed ESP32-S3 behavior below supplements that scope;
-other hardware qualification remains deferred. No compiled binaries are required.
+Version 1.4.0 is a locally prepared, backward-compatible source candidate with native
+S.BUS diagnostics, cumulative fault-frame counters and receiver calibration tools.
+Local technical acceptance, an ordinary local commit, exact-commit CI, a GitHub
+tag/release and external registry availability are distinct milestones. Current
+local results and independent acceptance are recorded in the private finalization
+report; none of the publication operations below is authorized by this checklist.
 
-## Completed software and package requirements
+## Local technical qualification
 
-- [x] Native GCC and Clang regressions, including historical protections and v1.1 compatibility.
-- [x] Corrective switch/failsafe, JSON type-validation and calibration regressions, including negative cases.
-- [x] ASan/UBSan checks across native, corrective, JSON and calibration tests. Local Darwin leak detection is unavailable and disabled.
-- [x] Independent decoder round trips/noise and axis-property checks.
-- [x] Portable architecture builds: ESP32-S3, ESP8266, RP2040, SAMD/MKR Zero, SAM/Due, Teensy 4.1 and STM32/Blue Pill.
-- [x] All five ESP32-S3 examples compile as separate library consumers.
-- [x] Consistent 1.3.1 metadata, MIT licence, manifests and declared ArduinoJson dependency.
-- [x] Curated source-distribution checks and private/generated-file rejection probes.
-- [x] Independent Maintainer and coordinator software acceptance.
-- [x] GitHub Actions: all 13 jobs PASS on the reviewed pre-amendment candidate ([successful run](https://github.com/littlemanbuilds/RCLink/actions/runs/43492344319)).
+Use installed prerequisites and the existing pinned PlatformIO environments.
 
-Reuse the completed source qualification. Documentation amendment still requires
-CI on the new exact commit. Record that final commit and successful run in the
-published release notes/evidence, rather than hardcoding a final SHA here and
-creating another amendment cycle. Workflow configuration alone is not CI evidence.
+- GCC and Clang native/protocol and corrective regressions, compatibility fixtures,
+  JSON/calibration helpers, native S.BUS/counter coverage, shared calibration parity/JSON/invalid-evidence cases and ASan/UBSan.
+- Synthetic host-capture tests: quiet/full echo, complete records, commands,
+  annotations, partial/oversized/malformed input, failure diagnostics and shutdown.
+- Seven portable consumers: `esp32-s3-devkitc-1`, `esp8266_nodemcuv2`, `pico`,
+  `mkrzero`, `due`, `teensy41`, `bluepill_f103c8`.
+- All six examples separately for ESP32-S3 in learning order: basic iBUS,
+  iBUS calibration, S.BUS calibration, Flysky mapping, JSON, advanced features;
+  also compile the separate test/sbus_diagnostic/SbusDiagnostic.ino producer.
+  never place multiple sketch entry points in a consumer project.
+- Exact 1.4.0 version surfaces, public API documentation/keywords, example catalogue,
+  curated distribution and private/generated-file rejection probes.
+- Fresh independent review of F01–F06 and the actual final candidate. A historical
+  approval or CI receipt is not final 1.4.0 approval.
+
+## Verified physical S.BUS scope — observed 2026-11-17
+
+The isolated ESP32-S3 N16R8 / FS-i6X / FS-iA6B session used inverted 100000-baud
+8E2 on GPIO18, no receiver TX and no actuators. CH1–CH6 travel and CH7–CH10 switch
+positions were observed. All 28,950 available native/converted pairs matched the
+unchanged conversion. Typical travel 240–1807 produced 1041–1997; resting 1024
+produced 1519. CH4's high 1796–1797 produced 1990–1991. Throttle's normal low rest
+was 243–245 (1043–1044), distinct from its sweep minimum 240. These are receiver
+observations, not universal calibration defaults or physical pulse-width measurements.
+
+Transmitter-off produced frame-lost then failsafe flags while fresh receiver frames
+continued; recovery cleared current flags and retained cumulative fault counts.
+Signal interruption stopped accepted frames, produced stale native evidence and
+crossed the 200 ms freshness threshold between sampled ages 166 ms and 266 ms. Recovery
+restored fresh data. Same-poll fault-to-healthy preservation is deterministic
+software-fixture evidence, not a forced physical wire sequence.
+
+The 10 Hz capture had a disclosed reader gap, an excluded partial final record and
+scheduled logging omissions. Guaranteed RF-loss latency, continuous wire-level
+capture, universal receiver compatibility and vehicle/actuator safety remain
+**unqualified**. RF onset and electrical transitions were not instrumented. Physical
+asymmetric calibration, plausibility-limit rejection and learned-switch hysteresis
+remain unperformed cases. No additional physical test is implied by source acceptance.
+
+## Delivery sequence — operator-controlled, not yet performed
+
+1. After independent technical approval, inspect the exact public staging inventory
+   and index; exclude AGENTS.md, local reports, credentials and generated artifacts.
+2. Obtain operator approval and create a **new ordinary local commit** on the intended
+   branch. Verify HEAD and tree/index status, and rerun appropriate exact-commit local
+   integrity checks. Preserve all existing commits and tags.
+3. Obtain separate authorization before remote push. Make the exact candidate commit
+   available remotely and require successful GitHub Actions for that exact SHA.
+   Do not substitute the historical 1.3.1 run or a workflow file for an actual result.
+4. Obtain explicit approval for a new immutable `v1.4.0` tag after exact-commit checks
+   and CI. Tag only that verified commit; confirm the name is unused. Remote tag
+   publication requires its own authorization.
+5. Obtain separate approval and publish the GitHub source release. Verify its tag,
+   commit, curated public assets and release notes. A tag alone is not a release.
+6. Verify Arduino Library Manager indexing and PlatformIO Registry availability as
+   separate states after their separately authorized distribution operations. Do not
+   claim 1.4.0 availability before each listing is actually checked.
+
+No commit, push, tag, GitHub release or registry operation has been performed in this
+finalization task. Exact committed-source qualification and remote CI remain pending
+those authorized operations; they do not make local technical approval circular.
+
+## Historical 1.3.1 qualification — context only
+
+The predecessor source and focused iBUS/signature behavior were qualified separately.
+Its [historical GitHub Actions run](https://github.com/littlemanbuilds/RCLink/actions/runs/43492344319)
+covered the earlier candidate. It does not qualify 1.4.0. The observations below are
+retained history, not current delivery instructions or additional safety guarantees.
 
 ## Physical iBUS smoke test — observed on 2026-11-13
 
@@ -62,39 +120,3 @@ overhead, and excludes the receiver's unmeasured RF-loss detection latency.
 The single-channel failsafe-OFF comparison was not performed; OFF/hold behavior is
 documented from the transmitter manual. Native signature/history regressions were
 inspected and reused without rerunning completed qualification.
-
-## Additional hardware qualification — owner-deferred, NOT_RUN
-
-These unperformed checks remain outstanding and limit the release claim. Software
-regressions and the focused smoke test do not substitute for them.
-
-- [ ] Asymmetric stick calibration on the physical installation.
-- [ ] Plausibility limits measured with margin, including rejection and recovery.
-- [ ] Deliberately truncated/noisy physical traffic and restoration.
-- [ ] Learned switch hysteresis on physical hardware.
-- [ ] Physical SBUS operation on ESP32 before any physically validated SBUS claim.
-
-Only the observed iBUS integration, missing-frame failsafe and configured signature
-recognition/enforcement are hardware verified; general RF-loss detection, SBUS and
-vehicle safety are not. This receiver deliberately continued fresh frames at its
-programmed full-scale positions with its transmitter off, so applications must validate their
-receiver failsafe configuration and any RF-loss signature before enabling actuation.
-RCLink is not an independently certified safety system. Further physical work requires
-owner authorization with actuators disconnected and compatible signal wiring.
-
-## Outstanding owner-operated release requirements
-
-- [ ] Review and stage README.md, CHANGELOG.md, RELEASE_CHECKLIST.md and the comment-only Example 05 correction, then amend the existing corrective commit without changing its message; preserve unrelated work.
-- [ ] Fetch and confirm remote main has not advanced unexpectedly; push the amendment using an explicit safe force-with-lease operation. Resolve unexpected changes rather than overwriting them.
-- [ ] Verify all 13 GitHub Actions jobs PASS on the exact amended release commit.
-- [ ] Create and push the new v1.3.1 tag pointing to that verified commit. Never move or overwrite a historical tag.
-- [ ] Publish the GitHub source release with accumulated changes since published v1.2.0, compatibility guidance and the focused iBUS scope and remaining physical limitations.
-- [ ] Confirm the published tag/release and source inventory contain only public source, examples, manifests, licence and documentation/test material; no private controls, historical administrative evidence, Git internals, credentials or generated artifacts.
-- [ ] Recheck Arduino Library Manager indexing and PlatformIO Registry publication for 1.3.1, completing any separate registry update before claiming availability.
-
-RCLink is registered in both registries. As checked on 2026-11-13, their latest
-listed version is 1.2.0; 1.3.1 is not yet available there. GitHub publication and
-registry availability are separate states. Use the curated source ZIP or the new
-Git tag only after publication. Do not upload the development-directory ZIP.
-
-This checklist authorizes no Git, publication, flashing or connection changes.

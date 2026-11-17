@@ -3,7 +3,7 @@
  *
  * @brief Map a Flysky FS-i6X receiver into ten named axes and switches.
  *
- * @file 03_FlyskyFSi6XDemo.ino
+ * @file 04_FlyskyFSi6XDemo.ino
  * @author Little Man Builds (Darren Osborne)
  * @date 2025-10-08
  * @copyright Copyright (c) 2026 Little Man Builds

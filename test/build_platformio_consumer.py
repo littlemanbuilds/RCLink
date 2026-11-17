@@ -4,6 +4,7 @@ Arguments: source, scratch, environment, sketch, installed PlatformIO root,
 and (for pico) the exact provisioned pioasm package. No installation occurs here.
 """
 
+import base64
 import hashlib
 import os
 from pathlib import Path
@@ -71,6 +72,11 @@ def main():
     for name in ("library.json", "library.properties"):
         shutil.copy2(source / name, library / name)
     shutil.copy2(source / "platformio.ini", project / "platformio.ini")
+    if "--stack-usage" in sys.argv[6:]:
+        # Compiler-only evidence for the selected calibration helper, not runtime
+        # instrumentation or a retained build archive.
+        config = project / "platformio.ini"
+        config.write_text(config.read_text().replace("[env]\n", "[env]\nbuild_flags = -fstack-usage\n", 1))
     shutil.copy2(source / sketch, project / "src" / Path(sketch).name)
     dependency = Path(os.environ["PLATFORMIO_LIBDEPS_DIR"]) / environment / "ArduinoJson"
     if not dependency.exists():
@@ -84,6 +90,23 @@ def main():
     if result.returncode == 0:
         assert elf.is_file() and elf.stat().st_size > 0, "Successful link must produce an ELF"
         print("LINKED_ELF", elf.stat().st_size, digest(elf), flush=True)
+        if "--stack-usage" in sys.argv[6:]:
+            for usage in elf.parent.rglob("*.su"):
+                for line in usage.read_text().splitlines():
+                    if "run_calibration" in line or "run_ibus" in line or "run_sbus" in line:
+                        fields = line.split("\t")
+                        print("CALIBRATION_STACK", Path(sketch).stem, *fields[-2:], flush=True)
+        if "--emit-firmware" in sys.argv[6:]:
+            # Explicit minimal binary transfer through stdout to the trusted caller.
+            # No build tree or ELF archive is retained, and this never flashes.
+            assert environment == "esp32-s3-devkitc-1"
+            for name in ("bootloader.bin", "partitions.bin", "firmware.bin"):
+                path = elf.parent / name
+                print("FIRMWARE_BASE64", name, digest(path),
+                      base64.b64encode(path.read_bytes()).decode("ascii"), flush=True)
+            path = installed / "packages/framework-arduinoespressif32/tools/partitions/boot_app0.bin"
+            print("FIRMWARE_BASE64", "boot_app0.bin", digest(path),
+                  base64.b64encode(path.read_bytes()).decode("ascii"), flush=True)
     print("CONSUMER", environment, sketch, "EXIT", result.returncode,
           "SECONDS", round(time.monotonic() - started, 3), flush=True)
     return result.returncode

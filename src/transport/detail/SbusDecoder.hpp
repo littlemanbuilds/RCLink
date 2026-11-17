@@ -33,6 +33,9 @@ class SbusDecoder
     void reset() noexcept
     {
         count_ = 0u;
+        has_frame_ = false;
+        lost_frames_ = 0u;
+        failsafe_frames_ = 0u;
         failsafe_ = false;
         frame_lost_ = false;
         frames_ = 0u;
@@ -120,7 +123,7 @@ class SbusDecoder
     }
 
     /**
-     * @brief Read one decoded channel in approximate microseconds.
+     * @brief Read one decoded channel in pulse-width-style units (not a measured pulse).
      *
      * @param channel Zero-based channel index [0,15].
      * @return Converted channel value, or zero when out of range.
@@ -128,6 +131,48 @@ class SbusDecoder
     int readRaw(int channel) const noexcept
     {
         return (channel >= 0 && channel < kSbusChannels) ? channels_us_[static_cast<std::size_t>(channel)] : 0;
+    }
+
+    /**
+     * @brief Copy an unnormalized 11-bit analogue code from the last accepted frame.
+     *
+     * Call from the same polling context as feed/reset; concurrent access is not
+     * synchronized. Native, readRaw(), flags, frames() and lastGoodMs() describe
+     * the same latest accepted frame. Partial/rejected frames leave them intact.
+     * A successful read proves reception, not freshness or healthy receiver status;
+     * stale, frame-lost and failsafe values remain available for diagnostics.
+     *
+     * @param channel Zero-based analogue channel index [0,15].
+     * @param value Destination; unchanged on failure.
+     * @return False before reception, after reset, or for an invalid index;
+     *         otherwise true with the original code in [0,2047].
+     */
+    bool tryReadNative(int channel, std::uint16_t &value) const noexcept
+    {
+        if (!has_frame_ || channel < 0 || channel >= kSbusChannels)
+            return false;
+        value = native_[static_cast<std::size_t>(channel)];
+        return true;
+    }
+
+    /**
+     * @brief Count accepted frames carrying the frame-lost bit since reset.
+     *
+     * @return Modulo-2^32 count, including frames superseded within one poll.
+     */
+    std::uint32_t lostFrames() const noexcept
+    {
+        return lost_frames_;
+    }
+
+    /**
+     * @brief Count accepted frames carrying the failsafe bit since reset.
+     *
+     * @return Modulo-2^32 count, including frames superseded within one poll.
+     */
+    std::uint32_t failsafeFrames() const noexcept
+    {
+        return failsafe_frames_;
     }
 
     /**
@@ -319,9 +364,15 @@ class SbusDecoder
         const std::uint8_t flags = d[22];
         frame_lost_ = (flags & (1u << 2u)) != 0u;
         failsafe_ = (flags & (1u << 3u)) != 0u;
+        if (frame_lost_)
+            ++lost_frames_;
+        if (failsafe_)
+            ++failsafe_frames_;
+        has_frame_ = true;
 
         for (std::size_t i = 0u; i < static_cast<std::size_t>(kSbusChannels); ++i)
         {
+            native_[i] = ch[i];
             const int value = static_cast<int>(ch[i]);
             int microseconds = 1000 + ((value - 172) * 1000) / 1639;
             if (microseconds < 800)
@@ -335,6 +386,10 @@ class SbusDecoder
     std::uint8_t buffer_[kFrameBytes]{}; ///< Partial SBUS frame.
     std::size_t count_{0u};              ///< Bytes currently buffered.
     int channels_us_[kSbusChannels]{};   ///< Last accepted analogue channels.
+    std::uint16_t native_[kSbusChannels]{}; ///< Original codes from the same accepted frame.
+    bool has_frame_{false};              ///< Reception validity independent of counter wrap.
+    std::uint32_t lost_frames_{0u};       ///< Accepted frames carrying frame-lost evidence.
+    std::uint32_t failsafe_frames_{0u};   ///< Accepted frames carrying failsafe evidence.
     bool failsafe_{false};               ///< Last failsafe flag.
     bool frame_lost_{false};             ///< Last frame-lost flag.
     std::uint32_t frames_{0u};           ///< Accepted frames.
