@@ -2,7 +2,17 @@
 
 All notable RCLink changes are documented here.
 
-## [1.4.0] - Unreleased (locally prepared)
+## [1.4.1] - Unreleased
+
+### Fixed
+
+- Use a literal PlatformIO export list and package from the approved Git commit.
+  The release check verifies the resulting archive against the expected inventory
+  and file bytes before publication.
+- Reconcile installation instructions with the verified 1.4.0 GitHub and Arduino
+  source downloads and the PlatformIO packaging discrepancy.
+
+## [1.4.0] - 2026-11-17
 
 ### Added
 

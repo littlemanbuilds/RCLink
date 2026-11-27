@@ -8,7 +8,7 @@ RCLink is intentionally **not** a motor controller, safety supervisor, authority
 
 > **What is the receiver currently asking for, and is that receiver data valid enough to use?**
 
-- **Version:** 1.4.0 (locally prepared release candidate; not published)
+- **Version:** 1.4.1 (release candidate)
 - **Author:** Little Man Builds
 - **License:** MIT
 - **Qualification:** software-qualified with focused ESP32-S3 iBUS and configured receiver-signature tests. General RF-loss detection and vehicle safety remain unqualified. A focused isolated S.BUS bench session is described below. See [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md).
@@ -118,28 +118,25 @@ Include the public umbrella header after installing the library:
 #include <RCLink.h>
 ```
 
-Version 1.4.0 is locally prepared; it has not been committed, qualified by remote
-CI, tagged, published or confirmed in either registry as part of this work.
-For local evaluation, install a curated source ZIP using **Sketch → Include Library
-→ Add .ZIP Library…** and install ArduinoJson 7.x separately. Version 7.4.3 is the
-tested dependency. Do not package the entire development directory.
+Install RCLink from Arduino Library Manager or use the source ZIP from the
+published GitHub release with **Sketch → Include Library → Add .ZIP Library…**.
+For a manual ZIP install, install ArduinoJson 7.x separately. Version 7.4.3 is
+the tested dependency.
 
 ### PlatformIO
 
-After the operator has published and verified the immutable tag, this pinned URL
-will select the release:
+To pin the published 1.4.0 source, use the verified GitHub tag:
 
 ```ini
 lib_deps =
     https://github.com/littlemanbuilds/RCLink.git#v1.4.0
 ```
 
-Until then, use the reviewed local source. A prepared version, a local commit,
-successful CI on that exact commit, a GitHub tag/release and external registry
-availability are separate states. Check Arduino Library Manager and PlatformIO
-Registry independently after publication; prior listings do not prove 1.4.0 is
-available. ArduinoJson is declared as a dependency (`^7.4.2` in PlatformIO).
-Recheck mapping, receiver-specific calibration and failsafe behavior before use.
+The PlatformIO Registry archive for 1.4.0 includes generated test outputs and
+Finder metadata. The GitHub tag above provides the reviewed source inventory.
+Use the Registry package for 1.4.1 when its public download has been verified.
+PlatformIO resolves ArduinoJson using the declared `^7.4.2` constraint. Recheck
+mapping, receiver-specific calibration and failsafe behavior before use.
 
 ---
 
@@ -1151,12 +1148,10 @@ Runs AddressSanitizer and UndefinedBehaviorSanitizer over the deterministic suit
 
 ### Cross-platform compile matrix
 
-The earlier 1.3.1 candidate had a successful historical
-[GitHub Actions run](https://github.com/littlemanbuilds/RCLink/actions/runs/43492344319).
-That receipt does not qualify 1.4.0. The current release matrix selects all seven
-repository targets and all six examples independently; see
-[RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md) for local qualification and the separate
-exact-commit CI/publication gates.
+CI builds all seven repository targets and all six examples independently.
+For the published 1.4.0 baseline, see the
+[v1.4.0 GitHub Actions run](https://github.com/littlemanbuilds/RCLink/actions/runs/44190526350).
+See [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md) for the 1.4.1 delivery gates.
 
 ### Hardware tests still matter
 
@@ -1380,7 +1375,7 @@ Histogram and dwell counters saturate instead of wrapping.
 Current version:
 
 ```text
-1.4.0
+1.4.1
 ```
 
 See [CHANGELOG.md](CHANGELOG.md) for detailed release history.

@@ -14,10 +14,10 @@
 
 // ---- Version ---- //
 
-#define RCLINK_VERSION "1.4.0"
+#define RCLINK_VERSION "1.4.1"
 #define RCLINK_VERSION_MAJOR 1
 #define RCLINK_VERSION_MINOR 4
-#define RCLINK_VERSION_PATCH 0
+#define RCLINK_VERSION_PATCH 1
 
 // ---- Public API ---- //
 

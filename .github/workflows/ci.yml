@@ -76,6 +76,9 @@ jobs:
 
       - name: Install PlatformIO
         run: python -m pip install platformio==6.1.19
+      - name: Check PlatformIO package inventory
+        if: matrix.env == 'esp32-s3-devkitc-1'
+        run: bash test/check_distribution.sh "$(command -v python)"
       - name: Compile portable smoke sketch
         run: pio ci --project-conf platformio.ini --lib=. -e "${{ matrix.env }}" test/portable_compile/portable_compile.ino
   examples:

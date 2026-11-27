@@ -1,13 +1,10 @@
-# RCLink v1.4.0 release checklist
+# RCLink v1.4.1 release checklist
 
 ## Current release scope
 
-Version 1.4.0 is a locally prepared, backward-compatible source candidate with native
-S.BUS diagnostics, cumulative fault-frame counters and receiver calibration tools.
-Local technical acceptance, an ordinary local commit, exact-commit CI, a GitHub
-tag/release and external registry availability are distinct milestones. Current
-local results and independent acceptance are recorded in the private finalization
-report; none of the publication operations below is authorized by this checklist.
+Version 1.4.1 corrects distribution packaging and release documentation. Its
+functional baseline is the published v1.4.0 release, which added native S.BUS
+diagnostics, cumulative fault-frame counters and guided calibration.
 
 ## Local technical qualification
 
@@ -23,10 +20,10 @@ Use installed prerequisites and the existing pinned PlatformIO environments.
   iBUS calibration, S.BUS calibration, Flysky mapping, JSON, advanced features;
   also compile the separate test/sbus_diagnostic/SbusDiagnostic.ino producer.
   never place multiple sketch entry points in a consumer project.
-- Exact 1.4.0 version surfaces, public API documentation/keywords, example catalogue,
+- Exact 1.4.1 version surfaces, public API documentation, example catalogue,
   curated distribution and private/generated-file rejection probes.
-- Fresh independent review of F01–F06 and the actual final candidate. A historical
-  approval or CI receipt is not final 1.4.0 approval.
+- Bind the release to the independent review and CI evidence for the final commit.
+  Retain the earlier functional and physical observations within their original scope.
 
 ## Verified physical S.BUS scope — observed 2026-11-17
 
@@ -52,28 +49,23 @@ capture, universal receiver compatibility and vehicle/actuator safety remain
 asymmetric calibration, plausibility-limit rejection and learned-switch hysteresis
 remain unperformed cases. No additional physical test is implied by source acceptance.
 
-## Delivery sequence — operator-controlled, not yet performed
+## Delivery sequence
 
-1. After independent technical approval, inspect the exact public staging inventory
-   and index; exclude AGENTS.md, local reports, credentials and generated artifacts.
-2. Obtain operator approval and create a **new ordinary local commit** on the intended
-   branch. Verify HEAD and tree/index status, and rerun appropriate exact-commit local
-   integrity checks. Preserve all existing commits and tags.
-3. Obtain separate authorization before remote push. Make the exact candidate commit
-   available remotely and require successful GitHub Actions for that exact SHA.
-   Do not substitute the historical 1.3.1 run or a workflow file for an actual result.
-4. Obtain explicit approval for a new immutable `v1.4.0` tag after exact-commit checks
-   and CI. Tag only that verified commit; confirm the name is unused. Remote tag
-   publication requires its own authorization.
-5. Obtain separate approval and publish the GitHub source release. Verify its tag,
-   commit, curated public assets and release notes. A tag alone is not a release.
-6. Verify Arduino Library Manager indexing and PlatformIO Registry availability as
-   separate states after their separately authorized distribution operations. Do not
-   claim 1.4.0 availability before each listing is actually checked.
-
-No commit, push, tag, GitHub release or registry operation has been performed in this
-finalization task. Exact committed-source qualification and remote CI remain pending
-those authorized operations; they do not make local technical approval circular.
+1. Review the source candidate and its complete public file projection. The owner
+   stages, commits and pushes the approved files.
+2. Verify the pushed commit and all required GitHub Actions jobs for that SHA.
+   Confirm the new version is unused. The owner creates the local `v1.4.1` tag
+   at the verified commit.
+3. In protected scratch, use the Python environment for PlatformIO Core 6.1.19
+   to run `python -B test/pack_release.py commit REPOSITORY COMMIT OUTPUT CHECKER`
+   with the full commit SHA, a new output directory and the path to the LMB
+   Harness `publication.py`. Verify the generated plan and all four archives with
+   the Harness release procedure before the owner publishes the tag and GitHub
+   release.
+4. Obtain exact artifact-bound owner authorization before uploading the normalized
+   PlatformIO archive. Retrieve the actual GitHub ZIP and TAR, PlatformIO archive
+   and Arduino Library Manager ZIP independently. Close the release only after
+   the separate public distribution review.
 
 ## Historical 1.3.1 qualification — context only
 

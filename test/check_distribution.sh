@@ -2,6 +2,10 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+if [[ $# -gt 1 ]]; then
+    echo "usage: $0 [PLATFORMIO_PYTHON]" >&2
+    exit 2
+fi
 STAGE="$(mktemp -d "${TMPDIR:-/tmp}/rclink-distribution.XXXXXX")"
 trap 'rm -rf "$STAGE"' EXIT INT TERM
 
@@ -54,7 +58,7 @@ done
 for member in library.properties library.json src/RCLink.h README.md CHANGELOG.md RELEASE_CHECKLIST.md; do
     cp "$STAGE/$member" "$STAGE/version-original"
     python3 -B -c 'from pathlib import Path; import sys
-p=Path(sys.argv[1]); p.write_text(p.read_text().replace("1.4.0","1.4.1"))' "$STAGE/$member"
+p=Path(sys.argv[1]); p.write_text(p.read_text().replace("1.4.1","1.4.2"))' "$STAGE/$member"
     if bash "$ROOT/test/check_release_contracts.sh" --distribution "$STAGE" >/dev/null 2>&1; then
         echo "distribution-contract: failed to reject version drift in $member" >&2
         exit 1
@@ -69,4 +73,13 @@ if bash "$ROOT/test/check_release_contracts.sh" --distribution "$STAGE" >/dev/nu
     exit 1
 fi
 mv "$STAGE/version-original" "$STAGE/src/RCLink.h"
+
+if [[ $# -eq 1 ]]; then
+    # Model ignored build outputs, Finder files and untracked private files in the
+    # input directory. Core must emit exactly the manifest's literal file list.
+    mkdir -p "$STAGE/test/build"
+    touch "$STAGE/test/build/host-test" "$STAGE/src/.DS_Store" "$STAGE/examples/AGENTS.md"
+    "$1" -B "$ROOT/test/pack_release.py" check-platformio \
+        "$STAGE" "$STAGE/platformio-probe.tar.gz"
+fi
 echo "distribution-contract: PASS"

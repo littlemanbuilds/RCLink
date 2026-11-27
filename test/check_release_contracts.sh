@@ -37,20 +37,20 @@ props_ver="$(awk -F= '$1=="version"{print $2}' "$TARGET/library.properties")"
 json_ver="$(python3 -B -c 'import json,sys; print(json.load(open(sys.argv[1]))["version"])' "$TARGET/library.json")"
 header_ver="$(sed -n 's/^#define RCLINK_VERSION "\([^"]*\)"/\1/p' "$TARGET/src/RCLink.h")"
 [[ "$props_ver" == "$json_ver" && "$props_ver" == "$header_ver" ]] || fail "version mismatch"
-[[ "$props_ver" == "1.4.0" ]] || fail "unexpected release version $props_ver"
+[[ "$props_ver" == "1.4.1" ]] || fail "unexpected release version $props_ver"
 python3 -B -c 'import pathlib,re,sys
 root=pathlib.Path(sys.argv[1])
 header=(root/"src/RCLink.h").read_text()
-for name,value in (("MAJOR",1),("MINOR",4),("PATCH",0)):
+for name,value in (("MAJOR",1),("MINOR",4),("PATCH",1)):
     match=re.search(r"^#define RCLINK_VERSION_"+name+r" ([0-9]+)$",header,re.M)
     if not match or int(match[1])!=value:
         raise SystemExit("release-contract: numeric version mismatch: "+name)
 readme=(root/"README.md").read_text()
-if "**Version:** 1.4.0" not in readme or "Current version:\n\n```text\n1.4.0\n```" not in readme:
+if "**Version:** 1.4.1" not in readme or "Current version:\n\n```text\n1.4.1\n```" not in readme:
     raise SystemExit("release-contract: README release identity mismatch")
-if not (root/"CHANGELOG.md").read_text().split("## ",1)[1].startswith("[1.4.0]"):
+if not (root/"CHANGELOG.md").read_text().split("## ",1)[1].startswith("[1.4.1]"):
     raise SystemExit("release-contract: changelog release identity mismatch")
-if not (root/"RELEASE_CHECKLIST.md").read_text().startswith("# RCLink v1.4.0 release checklist"):
+if not (root/"RELEASE_CHECKLIST.md").read_text().startswith("# RCLink v1.4.1 release checklist"):
     raise SystemExit("release-contract: checklist release identity mismatch")
 for name in ("tryReadNative","lostFrames","failsafeFrames","run_sbus"):
     if not re.search(r"^"+name+r"\s+KEYWORD2$",(root/"keywords.txt").read_text(),re.M):
